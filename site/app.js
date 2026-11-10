@@ -5,7 +5,7 @@ import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/+e
 const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
 const REPO_URL = "https://github.com/vinaayakmanjunath/second-engineer";
 const HOUR = 3600e3;
-const NAV = [["index.html", "Fleet"], ["vessel.html", "Vessel"], ["quality.html", "Data quality"], ["pipeline.html", "Pipeline"]];
+const NAV = [["index.html", "Fleet"], ["vessel.html", "Vessel"], ["quality.html", "Data quality"], ["results.html", "Results"], ["pipeline.html", "Pipeline"]];
 const BANNER = "Virtual vessels derived from one real ship (ARC Gloria) · fault injected into GLORIA-C main engine from a test-bench signature · demonstration, not validated";
 const FOOTER = "Data: Sensor-Based Operational Dataset of Main Ship Machinery (ARC Gloria), Zenodo, DOI 10.5281/zenodo.18330661, CC BY 4.0. Marine Engine Fault dataset, Zenodo, DOI 10.5281/zenodo.19857425, CC BY 4.0. Data transformed (resampled, mapped, fault-injected) for demonstration. Virtual vessels; injected fault; demonstration, not validated.";
 
@@ -38,13 +38,28 @@ function healthClass(h) {
   return h >= 70 ? ["ok", "good"] : h >= 40 ? ["warn", "watch"] : ["bad", "poor"];
 }
 
-function likelyCause(alert, { full = false } = {}) {
+function likelyCause(alert) {
   const m = alert.fault_match ?? [];
   // gold decides confidence (mart_fault_match.confident); the page only displays it
   if (!m.length || !m[0].confident) return "no confident match";
-  if (!full) return `${esc(label(m[0].fault))} (${m[0].similarity.toFixed(2)})`;
-  const margin = m[0].margin == null ? "" : ` <span class="muted">· lead over #2: ${m[0].margin.toFixed(3)}</span>`;
-  return `<ol>${m.slice(0, 3).map((f) => `<li>${esc(label(f.fault))} <span class="muted">${f.similarity.toFixed(2)}</span></li>`).join("")}</ol>${margin}`;
+  const lead = m[0].margin == null ? "" : ` <span class="muted">· lead over #2: ${m[0].margin.toFixed(3)}</span>`;
+  const top3 = m.slice(0, 3).map((f) => `<li>${esc(label(f.fault))} <span class="muted">${f.similarity.toFixed(3)}</span></li>`).join("");
+  return `<details class="cause"><summary>${esc(label(m[0].fault))} <span class="muted">${m[0].similarity.toFixed(3)}</span>${lead}</summary><ol>${top3}</ol></details>`;
+}
+
+// One alerts table for the fleet and vessel pages. The System column appears only when rows span several systems.
+function alertsTable(rows, { extra = [], ...opts } = {}) {
+  const several = new Set(rows.map((a) => a.system)).size > 1;
+  return table([
+    ...extra,
+    ...(several ? [{ label: "System", text: (a) => a.system }] : []),
+    { label: "Opened (UTC)", text: (a) => fmtTime(a.opened_at) },
+    { label: "Status", html: (a) => ((a.open ?? a.status === "open") ? '<span class="status-open">open</span>' : "closed") },
+    { label: "Severity", text: (a) => a.severity },
+    { label: "Max |z|", num: true, text: (a) => fmtNum(a.max_abs_z, 1) },
+    { label: "Likely cause (similarity)", html: (a) => likelyCause(a) },
+    { label: "$ at risk (illustrative)", num: true, text: (a) => fmtUsd(a.usd_at_risk) },
+  ], rows, opts);
 }
 
 // Columns: {label, text?: row => value (escaped), html?: row => trusted markup, num?: bool}
@@ -111,10 +126,10 @@ function eventMarks(results, vessel) {
 const alertSpans = (alerts) =>
   Plot.rect(alerts, { x1: (a) => toDate(a.first_flagged), x2: (a) => toDate(a.last_seen), fill: css("--span"), fillOpacity: 0.18 });
 
-function healthPlot(width, { height = 220, marks = [], color } = {}) {
+function healthPlot(width, { height = 220, marks = [], color, x = timeAxis } = {}) {
   return Plot.plot({
     width, height, marginLeft: 40,
-    x: timeAxis,
+    x,
     y: { domain: [0, 100], label: "Health (0–100)", grid: true },
     color,
     marks,
@@ -185,33 +200,38 @@ async function initFleet() {
     // Live state is owned by gold (fleet.json); replay state is reconstructed client-side.
     const v = live
       ? { health: s.f.health_index, open: s.f.open_alerts, total: s.f.total_alerts, usd: s.f.usd_at_risk_open,
-          lag: `${fmtNum(s.f.freshness_lag_hours, 1)} h`, lagNote: "behind the newest batch in the fleet" }
-      : { ...s, lag: s.lagH == null ? "—" : `${fmtNum(s.lagH, 1)} h`, lagNote: "behind the replay time" };
+          lag: `${fmtNum(s.f.freshness_lag_hours, 1)} h`, lagNote: "vs fleet's newest batch" }
+      : { ...s, lag: s.lagH == null ? "—" : `${fmtNum(s.lagH, 1)} h`, lagNote: "vs replay time" };
     const [cls, word] = healthClass(v.health);
     return `<article class="card" data-vessel="${esc(s.f.vessel_id)}">
       <h3><a href="vessel.html?v=${encodeURIComponent(s.f.vessel_id)}">${esc(s.f.vessel_id)}</a></h3>
-      <p class="meta">${esc(s.f.owner)} · logger ${esc(s.f.logger)}</p>
       <dl>
-        <dt>Health index</dt><dd class="health ${cls}" data-k="health">${fmtNum(v.health, 1)} <small>${word}</small></dd>
-        <dt>Open / total alerts</dt><dd data-k="alerts">${v.open} / ${v.total}</dd>
+        <dt>Health</dt><dd class="health ${cls}" data-k="health"><span class="big">${fmtNum(v.health, 1)}</span> <small>${word}</small></dd>
+        <dt>Open alerts</dt><dd data-k="alerts">${v.open} / ${v.total}</dd>
         <dt>$ at risk <small>(illustrative)</small></dt><dd data-k="usd">${fmtUsd(v.usd)}</dd>
-        <dt>Data lag <small>${v.lagNote}</small></dt><dd data-k="lag">${v.lag}</dd>
-      </dl></article>`;
+      </dl>
+      <p class="meta">${esc(s.f.owner)} · ${esc(s.f.logger)} · data lag <span data-k="lag">${v.lag}</span> (${v.lagNote})</p></article>`;
   }
 
   const chartEl = $("#fleet-chart");
+  const focus = results?.injection?.vessel_id; // the vessel with the injected fault is drawn bold, the others thin and muted
+  if (focus) $("#chart-note").textContent = `${focus} (injected fault) in bold. `;
+  const xDomain = [new Date(Math.min(...me.map((r) => +r.t))), new Date(Math.max(...me.map((r) => +r.t)) + HOUR)];
   let T = end;
   chart(chartEl, (width) => {
     const past = me.filter((r) => r.t <= T);
+    const [hot, cold] = [past.filter((r) => r.vessel_id === focus), past.filter((r) => r.vessel_id !== focus)];
     return healthPlot(width, {
-      height: 260,
+      height: 230,
+      x: { ...timeAxis, domain: xDomain },
       color: { domain: vessels, legend: true },
       marks: [
         ...eventMarks(results),
-        Plot.line(me, { x: "t", y: "health", stroke: "vessel_id", z: "seg", strokeOpacity: 0.2 }),
-        Plot.line(past, { x: "t", y: "health", stroke: "vessel_id", z: "seg", strokeWidth: 1.6 }),
-        Plot.dot(past, { x: "t", y: "health", fill: "vessel_id", r: 1.2 }),
-        Plot.ruleX([T], { stroke: css("--fg"), strokeWidth: 1.5 }),
+        Plot.line(me, { x: "t", y: "health", stroke: "vessel_id", z: "seg", strokeOpacity: 0.15 }),
+        Plot.line(cold, { x: "t", y: "health", stroke: "vessel_id", z: "seg", strokeWidth: 1, strokeOpacity: focus ? 0.45 : 1 }),
+        Plot.line(hot, { x: "t", y: "health", stroke: "vessel_id", z: "seg", strokeWidth: 2.4 }),
+        Plot.dot(hot, { x: "t", y: "health", fill: "vessel_id", r: 1.4 }),
+        Plot.ruleX([T], { stroke: css("--fg"), strokeWidth: 1.5, clip: true }),
         Plot.tip(past, Plot.pointer({ x: "t", y: "health", stroke: "vessel_id",
           title: (d) => `${d.vessel_id} ME\n${fmtTime(d.t)} UTC\nhealth ${d.health} · ${d.flagged} sensors flagged` })),
       ],
@@ -227,27 +247,32 @@ async function initFleet() {
     const state = stateAt(T);
     $("#cards").innerHTML = state.map((s) => card(s, live)).join("");
     const recent = state.flatMap((s) => s.alerts).sort((a, b) => b.opened - a.opened);
-    $("#alerts").innerHTML = table([
-      { label: "Vessel", html: (a) => `<a href="vessel.html?v=${encodeURIComponent(a.vessel_id)}">${esc(a.vessel_id)}</a>` },
-      { label: "System", text: (a) => a.system },
-      { label: "Opened (UTC)", text: (a) => fmtTime(a.opened) },
-      { label: "Status", html: (a) => (a.open ? '<span class="status-open">open</span>' : "closed") },
-      { label: "Severity", text: (a) => a.severity },
-      { label: "Max |z|", num: true, text: (a) => fmtNum(a.max_abs_z, 1) },
-      { label: "Likely cause", html: (a) => likelyCause(a) },
-      { label: "$ at risk (illustrative)", num: true, text: (a) => fmtUsd(a.usd_at_risk) },
-    ], recent.slice(0, 10), {
+    $("#alerts").innerHTML = alertsTable(recent.slice(0, 5), {
+      extra: [{ label: "Vessel", html: (a) => `<a href="vessel.html?v=${encodeURIComponent(a.vessel_id)}">${esc(a.vessel_id)}</a>` }],
       empty: "No alerts opened yet at this time.",
-      caption: `Showing ${Math.min(10, recent.length)} of ${recent.length} alerts opened by ${fmtTime(T)} UTC. Status is as of that time; severity, max |z|, likely cause and $ describe the whole alert window. $ at risk is illustrative (assumed off-hire event cost, not a pricing model).`,
+      caption: `${Math.min(5, recent.length)} most recent of ${recent.length} alerts opened by ${fmtTime(T)} UTC; status as of that time. Click a cause for the top 3. $ is illustrative.`,
     });
     draw(chartEl);
   }
   slider.addEventListener("input", update);
   $("#live-btn").addEventListener("click", () => { slider.value = steps; update(); });
+  const failure = toDate(results?.injection?.failure_utc);
+  if (failure) {
+    // the slider moves in whole hours from the first reading; jump to the step nearest the declared failure
+    const btn = $("#fault-btn");
+    btn.hidden = false;
+    btn.addEventListener("click", () => { slider.value = Math.min(steps, Math.max(0, Math.round((failure - start) / HOUR))); update(); });
+  }
   $("#replay-range").textContent = `${fmtTime(start)} → ${fmtTime(end)} UTC`;
   update();
+}
 
-  $("#results").innerHTML = results ? resultsSummary(results) : '<p class="muted">Results pending — the evaluation summary has not been published yet.</p>';
+// ---------- Results ----------
+async function initResults() {
+  const r = (await load("run.json")).results;
+  const pending = '<p class="muted">Results pending — the evaluation summary has not been published yet.</p>';
+  $("#results").innerHTML = r ? resultsSummary(r) : pending;
+  $("#false-alerts").innerHTML = r ? falseAlerts(r) : pending;
 }
 
 function resultsSummary(r) {
@@ -272,11 +297,14 @@ function resultsSummary(r) {
       ${fc.paired_hours.control_only} only in the control, ${fc.paired_hours.both} in both. Before the ramp the control flags
       ${Math.round(fc.paired_hours.control_pre_ramp_flag_rate * 100)}% of healthy hours (natural drift).</p>` : ""}
     </div></div>
-    <h3>False alerts</h3><p class="muted">Alerts on data with no fault: the healthy vessels from this run, and the injected vessel from its no-fault control, where every alert is false.</p>${table([
+    <p class="muted">Results generated ${fmtTime(r.generated_utc)} UTC.</p>`;
+}
+
+function falseAlerts(r) {
+  return `<p class="muted">Alerts on data with no fault: the healthy vessels from this run, and the injected vessel from its no-fault control, where every alert is false.</p>${table([
       { label: "Vessel", text: (x) => x.vessel_id }, { label: "Alerts", num: true, text: (x) => x.alerts },
       { label: "Running days", num: true, text: (x) => fmtNum(x.running_days, 1) },
-      { label: "Per running day", num: true, text: (x) => fmtNum(x.per_running_day, 2) }], r.false_alerts ?? [])}
-    <p class="muted">Results generated ${fmtTime(r.generated_utc)} UTC.</p>`;
+      { label: "Per running day", num: true, text: (x) => fmtNum(x.per_running_day, 2) }], r.false_alerts ?? [])}`;
 }
 
 // ---------- Vessel detail ----------
@@ -381,19 +409,14 @@ async function initVessel() {
     }));
 
     $("#vessel-alerts-title").textContent = `Alerts — ${v}`;
-    $("#vessel-alerts").innerHTML = table([
-      { label: "Opened (UTC)", text: (a) => fmtTime(a.opened_at) },
-      { label: "System", text: (a) => a.system },
-      { label: "Status", html: (a) => (a.status === "open" ? '<span class="status-open">open</span>' : "closed") },
-      { label: "Flagged h", num: true, text: (a) => a.flagged_hours },
-      { label: "Max |z|", num: true, text: (a) => fmtNum(a.max_abs_z, 1) },
-      { label: "Severity", text: (a) => a.severity },
-      { label: "Sensors", html: (a) => `<span title="${esc(a.sensors)}">${a.sensors ? a.sensors.split(",").length : 0}</span>` },
-      { label: "Likely cause (similarity)", html: (a) => likelyCause(a, { full: true }) },
-      { label: "$ at risk (illustrative)", num: true, text: (a) => fmtUsd(a.usd_at_risk) },
-    ], alerts.filter((a) => a.vessel_id === v).sort((a, b) => toDate(b.opened_at) - toDate(a.opened_at)), {
+    $("#vessel-alerts").innerHTML = alertsTable(
+      alerts.filter((a) => a.vessel_id === v).sort((a, b) => toDate(b.opened_at) - toDate(a.opened_at)), {
+      extra: [
+        { label: "Flagged h", num: true, text: (a) => a.flagged_hours },
+        { label: "Sensors", html: (a) => `<span title="${esc(a.sensors)}">${a.sensors ? a.sensors.split(",").length : 0}</span>` },
+      ],
       empty: "No alerts for this vessel.",
-      caption: `Likely cause = top-3 bench fault signatures by cosine similarity; below ${run.settings.detection.match_min} shown as no confident match. A small lead over #2 means the top two faults look alike. $ at risk is illustrative (assumed off-hire event cost, not a pricing model). Shaded spans on the charts are alert windows.`,
+      caption: `Likely cause = best-matching bench fault signature by cosine similarity (click for the top 3); below ${run.settings.detection.match_min} shown as no confident match. A small lead over #2 means the top two faults look alike. $ at risk is illustrative (assumed off-hire event cost, not a pricing model). Shaded spans on the charts are alert windows.`,
     });
   }
   await refresh();
@@ -422,12 +445,12 @@ async function initQuality() {
   const col = (lbl, k, d = 0) => ({ label: lbl, num: true, text: (r) => fmtNum(r[k], d) });
   const vcol = { label: "Vessel", text: (r) => r.vessel_id };
   $("#dq-volume").innerHTML = table([vcol, col("Days", "days"), col("Points valid", "points_valid"),
-    col("Quarantined", "points_quarantined"), col("Valid %", "valid_pct", 2), col("Mean daily coverage %", "coverage_pct", 1),
+    col("Quarantined", "points_quarantined"), col("Valid %", "valid_pct", 2), col("Mean daily coverage %", "coverage_pct", 1)],
+  totals, { caption: "Coverage % = share of the day's seconds with data." }) + `<details><summary>Quarantined points by reason</summary>${table([vcol,
     col("Missing value", "q_missing_value"), col("Bad timestamp", "q_bad_timestamp"), col("Future timestamp", "q_future_timestamp"),
-    col("Out of range", "q_out_of_range"), col("Unknown sensor", "q_unknown_sensor"), col("Unmapped points", "unmapped_points")],
-  totals, { caption: "Quarantine columns count points by reason. Coverage % = share of the day's seconds with data." });
+    col("Out of range", "q_out_of_range"), col("Unknown sensor", "q_unknown_sensor"), col("Unmapped points", "unmapped_points")], totals)}</details>`;
   $("#dq-transport").innerHTML = table([vcol, col("Batches loaded", "batches_loaded"), col("Duplicate files dropped", "duplicate_files"),
-    col("Duplicate batches dropped", "duplicate_batches"), col("Late batches (>1 h)", "late_batches"),
+    col("Duplicate batches dropped", "duplicate_batches"), col("Late batches (>1\u00a0h)", "late_batches"),
     col("Max daily lateness p95 (min)", "lateness_p95_max", 1), col("Out-of-order rows", "out_of_order_rows"),
     col("Flatlined sensor-hours", "flatlined_sensor_hours")], totals);
 
@@ -438,12 +461,18 @@ async function initQuality() {
         ...simVessels.map((v) => ({ label: v, num: true, text: (k) => fmtNum(sim[v][k]) }))],
       [...new Set(simVessels.flatMap((v) => Object.keys(sim[v]).filter((k) => typeof sim[v][k] === "number")))])
     : '<p class="muted">No simulator log in this run.</p>';
+  // Reconciliation grid: one row per check, one column per vessel, cell = handled / injected.
   const transport = run.results?.transport;
-  $("#sim-handled").innerHTML = transport
-    ? table([{ label: "Vessel", text: (x) => x.vessel_id }, { label: "Check", text: (x) => label(x.check) },
-        { label: "Injected", num: true, text: (x) => fmtNum(x.injected) }, { label: "Handled", num: true, text: (x) => fmtNum(x.handled) },
-        { label: "Match", html: (x) => (x.match == null ? '<span class="muted">not 1:1</span>' : x.match ? "yes" : '<span class="bad">no</span>') }], transport,
-      { caption: "“not 1:1”: injected and handled counts measure different things (e.g. rows shuffled vs rows seen out of order)." })
+  const recVessels = [...new Set((transport ?? []).map((x) => x.vessel_id))];
+  const cellOf = (check, v) => transport.find((x) => x.check === check && x.vessel_id === v);
+  const recCell = (x) => !x ? "—"
+    : x.match == null ? `${fmtNum(x.injected)} → ${fmtNum(x.handled)} <span class="muted">not 1:1</span>`
+    : `${fmtNum(x.handled)} / ${fmtNum(x.injected)} ${x.match ? '<span class="ok" aria-label="match">✓</span>' : '<span class="bad" aria-label="mismatch">✗</span>'}`;
+  $("#recon").innerHTML = transport
+    ? table([{ label: "Check", text: (c) => label(c) },
+        ...recVessels.map((v) => ({ label: v, num: true, html: (c) => recCell(cellOf(c, v)) }))],
+      [...new Set(transport.map((x) => x.check))],
+      { caption: "Cells read handled / injected. “not 1:1” rows show injected → handled: the two counts measure different things (e.g. rows shuffled in transit vs order breaks seen on arrival; batches sent late vs batches that arrived more than 1 h after their data)." })
     : '<p class="muted">Results pending — handled counts are published with the evaluation results.</p>';
 
   const metricSel = $("#dq-metric");
@@ -496,7 +525,7 @@ async function initPipeline() {
 }
 
 // ---------- boot ----------
-const PAGES_INIT = { fleet: initFleet, vessel: initVessel, quality: initQuality, pipeline: initPipeline };
+const PAGES_INIT = { fleet: initFleet, vessel: initVessel, quality: initQuality, results: initResults, pipeline: initPipeline };
 shell();
 PAGES_INIT[document.body.dataset.page]?.().catch((err) => {
   console.error(err);

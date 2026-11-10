@@ -41,6 +41,8 @@ h2 { font-size: 1.15rem; margin: 0 0 0.5em; }
 h3 { font-size: 1rem; margin: 0 0 0.4em; }
 .muted, small { color: var(--muted); }
 .skip { position: absolute; left: -999px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+h2 small { font-weight: 400; font-size: 0.85rem; }
 .skip:focus { left: 1rem; top: 0.5rem; background: var(--panel); padding: 0.4rem; z-index: 2; }
 
 .site-header { background: var(--panel); border-bottom: 1px solid var(--border); }
@@ -58,18 +60,23 @@ section, .panel { background: var(--panel); border: 1px solid var(--border); bor
 .grid2 > * { min-width: 0; }
 .grid2 > section { margin: 0; }
 
-.cards { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.cards { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 .card { border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.8rem; }
-.card .meta { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.85rem; }
+.card .meta { margin: 0.5rem 0 0; color: var(--muted); font-size: 0.8rem; }
 .card dl { display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 0.6rem; margin: 0; font-size: 0.9rem; }
 .card dt { color: var(--muted); }
 .card dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .health { font-weight: 700; }
+.health .big { font-size: 1.6rem; line-height: 1; }
+.card dd.health { align-self: end; }
+details.cause summary { cursor: pointer; }
+details.cause ol { margin: 0.2rem 0 0; }
+details > summary { cursor: pointer; }
 .ok { color: var(--ok); }
 .warn { color: var(--warn); }
 .bad { color: var(--bad); }
 
-.replay { display: grid; gap: 0.4rem; }
+.replay { display: grid; gap: 0.3rem; }
 .replay .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
 .replay input[type="range"] { width: 100%; }
 .replay output { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -80,11 +87,20 @@ button:disabled { opacity: 0.55; cursor: default; }
 .controls label { display: grid; gap: 0.15rem; font-size: 0.85rem; color: var(--muted); }
 select { font: inherit; padding: 0.25rem 0.4rem; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); max-width: 100%; }
 
-.table-wrap { overflow-x: auto; }
+/* Tables scroll inside their own box; edge shadows show there is more to the side (they vanish at each end). */
+.table-wrap {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--panel) 30%, transparent) left / 2rem 100% no-repeat local,
+    linear-gradient(to left, var(--panel) 30%, transparent) right / 2rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.22), transparent) left / 0.8rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.22), transparent) right / 0.8rem 100% no-repeat scroll;
+}
+#recon td:first-child { white-space: normal; min-width: 10rem; }
 table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
 caption { text-align: left; color: var(--muted); font-size: 0.82rem; padding-bottom: 0.3rem; caption-side: bottom; padding-top: 0.4rem; }
 th, td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
-th { font-weight: 600; white-space: nowrap; }
+th { font-weight: 600; }
 td:first-child { white-space: nowrap; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 td ol { margin: 0; padding-left: 1.1rem; }
