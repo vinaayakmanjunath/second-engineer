@@ -100,10 +100,50 @@ def window_metrics(s: Settings) -> dict:
     }
 
 
+def paired_hours(fault_wh: Path, control_wh: Path, gt: dict, min_sensors: int) -> dict:
+    """Hour-by-hour comparison of flags in the ramp window, fault run vs control (same vessel, same hours),
+    plus how often the control flags healthy hours before the ramp (the honest false-positive base rate)."""
+    con = duckdb.connect()
+    con.execute(f"attach '{fault_wh}' as f (read_only)")
+    con.execute(f"attach '{control_wh}' as c (read_only)")
+    p = {
+        "v": gt["vessel_id"],
+        "sys": gt["system"],
+        "start": gt["ramp_start_utc"],
+        "end": gt["failure_utc"],
+        "k": min_sensors,
+    }
+    both, fault_only, control_only, neither = con.execute(
+        """select count(*) filter (where f.n_sensors_flagged >= $k and c.n_sensors_flagged >= $k),
+                  count(*) filter (where f.n_sensors_flagged >= $k and c.n_sensors_flagged < $k),
+                  count(*) filter (where f.n_sensors_flagged < $k and c.n_sensors_flagged >= $k),
+                  count(*) filter (where f.n_sensors_flagged < $k and c.n_sensors_flagged < $k)
+           from f.mart_system_health f join c.mart_system_health c using (vessel_id, system, hour)
+           where vessel_id = $v and system = $sys and hour >= $start and hour < $end""",
+        p,
+    ).fetchone()
+    pre = con.execute(
+        """select avg((n_sensors_flagged >= $k)::int) from c.mart_system_health
+           where vessel_id = $v and system = $sys and hour < $start""",
+        {k: p[k] for k in ("v", "sys", "start", "k")},
+    ).fetchone()[0]
+    con.close()
+    return {
+        "both": both,
+        "fault_only": fault_only,
+        "control_only": control_only,
+        "neither": neither,
+        "control_pre_ramp_flag_rate": round(pre, 3) if pre is not None else None,
+    }
+
+
 def fault_vs_control(s: Settings) -> dict:
-    """Same vessel and detector with and without the fault. Lead time is claimed only if the control is quiet."""
+    """Same vessel and detector with and without the fault. Lead time is claimed only if the control is quiet.
+
+    Transport noise is seeded per vessel id, so the control is exactly paired with the full run."""
     fault = window_metrics(s)
-    control = window_metrics(isolated_run(s, 0.0, ROOT / "data" / "control"))
+    cs = isolated_run(s, 0.0, ROOT / "data" / "control")
+    control = window_metrics(cs)
     claimed = control["alerts_opened_in_window"] == 0 and fault["alerts_opened_in_window"] > 0
     if claimed:
         verdict = f"Lead time attributable to the fault: {fault['hours_before_failure']} h."
@@ -114,28 +154,36 @@ def fault_vs_control(s: Settings) -> dict:
     return {
         "with_fault": fault,
         "control": control,
+        "paired_hours": paired_hours(
+            s.path(s.warehouse), cs.path(cs.warehouse), ground_truth(s), s.detection.min_sensors
+        ),
+        "control_warehouse": str(cs.path(cs.warehouse)),
         "attributable_lead_time_hours": fault["hours_before_failure"] if claimed else None,
         "verdict": verdict,
     }
 
 
-def false_alerts(con: duckdb.DuckDBPyConnection, gt: dict) -> list[dict]:
-    """Alerts not explained by the injection, per vessel, per day with running data."""
-    cur = con.execute(
-        """with days as (
-               select vessel_id, count(distinct cast(hour as date)) as running_days
-               from mart_system_health group by all),
-           fa as (
-               select vessel_id, count(*) as alerts from mart_alerts
-               where not (vessel_id = $v and system = $sys and opened_at >= $start)
-               group by all)
-           select d.vessel_id, coalesce(fa.alerts, 0) as alerts, d.running_days,
-                  round(coalesce(fa.alerts, 0) / d.running_days, 3) as per_running_day
-           from days d left join fa using (vessel_id) order by 1""",
-        {"v": gt["vessel_id"], "sys": gt["system"], "start": gt["ramp_start_utc"]},
-    )
-    cols = [d[0] for d in cur.description]
-    return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+FALSE_ALERTS_SQL = """
+    with days as (
+        select vessel_id, count(distinct cast(hour as date)) as running_days
+        from mart_system_health group by all),
+    fa as (select vessel_id, count(*) as alerts from mart_alerts group by all)
+    select d.vessel_id, coalesce(fa.alerts, 0) as alerts, d.running_days,
+           round(coalesce(fa.alerts, 0) / d.running_days, 3) as per_running_day
+    from days d left join fa using (vessel_id) order by 1"""
+
+
+def false_alerts(main_wh: Path, control_wh: Path, injected_vessel: str) -> list[dict]:
+    """Alerts per day with running data, on data with no fault: the healthy vessels from the main run,
+    the injected vessel from its no-fault control (where every alert is false by construction)."""
+    rows = []
+    for wh, keep in ((main_wh, lambda v: v != injected_vessel), (control_wh, lambda v: v == injected_vessel)):
+        con = duckdb.connect(str(wh), read_only=True)
+        cur = con.execute(FALSE_ALERTS_SQL)
+        cols = [d[0] for d in cur.description]
+        rows += [r for r in (dict(zip(cols, x, strict=True)) for x in cur.fetchall()) if keep(r["vessel_id"])]
+        con.close()
+    return sorted(rows, key=lambda r: r["vessel_id"])
 
 
 def transport(s: Settings) -> list[dict]:
@@ -208,7 +256,6 @@ def transport(s: Settings) -> list[dict]:
 def write(s: Settings) -> dict:
     gt = ground_truth(s)
     fvc = fault_vs_control(s)
-    con = duckdb.connect(str(s.path(s.warehouse)), read_only=True)
     res = {
         "generated_utc": lake.now_utc().isoformat(timespec="seconds") + "Z",
         "injection": {
@@ -216,10 +263,10 @@ def write(s: Settings) -> dict:
             for k in ("vessel_id", "system", "fault", "severity_x_bench", "ramp_hours", "ramp_start_utc", "failure_utc")
         },
         "fault_vs_control": fvc,
-        "false_alerts": false_alerts(con, gt),
+        "min_sensors": s.detection.min_sensors,
+        "false_alerts": false_alerts(s.path(s.warehouse), Path(fvc["control_warehouse"]), gt["vessel_id"]),
         "transport": transport(s),
     }
-    con.close()
     docs = s.path(Path("docs"))
     docs.mkdir(exist_ok=True)
     lake.write_text_atomic(json.dumps(res, indent=2, default=str), docs / "results.json")
@@ -261,9 +308,22 @@ def render(r: dict) -> str:
     for key, name in METRIC_LABELS:
         a, b = fvc["with_fault"][key], fvc["control"][key]
         out.append(f"| {name} | {'-' if a is None else a} | {'-' if b is None else b} |")
+    ph = fvc["paired_hours"]
     out += [
         "",
-        "## Alerts not explained by the injection",
+        "Hour by hour in the ramp window (same vessel, same hours; flagged = at least "
+        f"{r['min_sensors']} sensors at abs z >= threshold):",
+        "",
+        "| flagged in fault run only | in control only | in both | in neither |",
+        "|---:|---:|---:|---:|",
+        f"| {ph['fault_only']} | {ph['control_only']} | {ph['both']} | {ph['neither']} |",
+        "",
+        f"Before the ramp the control flags {ph['control_pre_ramp_flag_rate']:.0%} of healthy hours: "
+        "natural drift, the reason no lead time is claimed.",
+        "",
+        "## False alerts (alerts on data with no fault)",
+        "",
+        "Healthy vessels from this run; the injected vessel from its no-fault control, where every alert is false.",
         "",
         "| vessel | alerts | days with running data | per running day |",
         "|---|---:|---:|---:|",

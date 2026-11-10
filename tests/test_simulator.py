@@ -28,3 +28,10 @@ def test_mess_rates_within_tolerance(s):
     assert abs(dups / n - s.simulator.duplicate_rate) < 0.01
     assert abs(orig["late"].mean() - s.simulator.late_rate) < 0.015
     assert (orig["sent_at"] >= orig["window_end"]).all()  # nothing is sent before its window closes
+
+
+def test_vessel_noise_does_not_depend_on_fleet_composition(s):
+    # the control re-runs one vessel alone; it must get the same transport noise as in the fleet
+    alone = s.model_copy(update={"fleet": s.fleet.model_copy(update={"vessels": [s.vessel("GLORIA-C")]})})
+    assert (simulator.vessel_rng(s, "GLORIA-C").random(5) == simulator.vessel_rng(alone, "GLORIA-C").random(5)).all()
+    assert not (simulator.vessel_rng(s, "GLORIA-C").random(5) == simulator.vessel_rng(s, "GLORIA-A").random(5)).all()

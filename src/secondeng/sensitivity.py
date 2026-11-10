@@ -15,11 +15,22 @@ SEVERITIES = [0.0, 1.0, 2.0, 3.0, 5.0]
 
 
 def write(main: Settings) -> Path:
-    rows = [
-        evaluate.window_metrics(evaluate.isolated_run(main, k, ROOT / "data" / "sensitivity" / f"x{k:g}"))
-        for k in SEVERITIES
+    runs = [evaluate.isolated_run(main, k, ROOT / "data" / "sensitivity" / f"x{k:g}") for k in SEVERITIES]
+    gt = evaluate.ground_truth(runs[0])
+    control_wh = runs[0].path(runs[0].warehouse)  # severity 0
+    rows = []
+    for s in runs:
+        ph = evaluate.paired_hours(s.path(s.warehouse), control_wh, gt, main.detection.min_sensors)
+        rows.append(
+            evaluate.window_metrics(s)
+            | {"fault_only_hours": ph["fault_only"], "control_only_hours": ph["control_only"]}
+        )
+    labels = [
+        *evaluate.METRIC_LABELS,
+        ("fault_only_hours", "hours flagged only with the fault"),
+        ("control_only_hours", "hours flagged only in the control"),
     ]
-    keys = ["severity_x_bench", *(k for k, _ in evaluate.METRIC_LABELS)]
+    keys = ["severity_x_bench", *(k for k, _ in labels)]
     out = [
         "# Sensitivity: detector response vs fault severity (generated)",
         "",
@@ -29,11 +40,16 @@ def write(main: Settings) -> Path:
         f"{main.injection.ramp_hours:g} h ramp. Severity = deviation at failure as a multiple of the deviation "
         "measured on the test bench. Severity 0 is the control (no fault): any alert there is a false alarm.",
         "",
-        "| severity x bench | " + " | ".join(name for _, name in evaluate.METRIC_LABELS) + " |",
+        "| severity x bench | " + " | ".join(name for _, name in labels) + " |",
         "|" + "---:|" * len(keys),
     ]
     out += ["| " + " | ".join("-" if r[k] is None else str(r[k]) for k in keys) + " |" for r in rows]
-    out += ["", "Compare each row with severity 0: only differences from the control are effects of the fault.", ""]
+    out += [
+        "",
+        "Compare each row with severity 0: only differences from the control are effects of the fault. The last two "
+        "columns pair the same hours of the same vessel with and without the fault.",
+        "",
+    ]
     path = main.path(Path("docs/sensitivity.md"))
     lake.write_text_atomic("\n".join(out), path)
     return path

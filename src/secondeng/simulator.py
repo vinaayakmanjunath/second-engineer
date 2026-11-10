@@ -12,6 +12,7 @@ from __future__ import annotations
 import gzip
 import io
 import json
+import zlib
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -168,11 +169,17 @@ def _plus_one_day(ts: str) -> str:
     return (datetime.strptime(ts, fmt) + timedelta(days=1)).strftime(fmt)
 
 
+def vessel_rng(s: Settings, vessel_id: str) -> np.random.Generator:
+    """Transport noise for one vessel, seeded by its id: the same whether it runs alone or in a fleet,
+    so a single-vessel control run is exactly paired with that vessel in the full run."""
+    return np.random.default_rng([s.seed, zlib.crc32(vessel_id.encode())])
+
+
 def simulate(s: Settings, until: datetime | None = None) -> dict:
     sig = signatures.write(s)
     log: dict = {"until_utc": until.isoformat() if until else None, "vessels": {}}
-    for i, v in enumerate(s.fleet.vessels):
-        rng = np.random.default_rng(s.seed + i)
+    for v in s.fleet.vessels:
+        rng = vessel_rng(s, v.vessel_id)
         frames = fleet.load_vessel(s, v)
         if v.vessel_id == s.injection.vessel_id:
             frames = inject.inject(s, frames, sig)
