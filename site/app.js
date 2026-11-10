@@ -268,8 +268,11 @@ function resultsSummary(r) {
     ${table([{ label: "Ramp window", text: (x) => x[0] }, { label: "With fault", num: true, text: (x) => v(f[x[1]]) },
       { label: "Control (no fault)", num: true, text: (x) => v(c[x[1]]) }], rows,
       { caption: "Same vessel and detector, re-run without the fault. Only differences from the control are effects of the fault." })}
+    ${fc.paired_hours ? `<p>Hour by hour in the window: <strong>${fc.paired_hours.fault_only} hours flagged only with the fault</strong>,
+      ${fc.paired_hours.control_only} only in the control, ${fc.paired_hours.both} in both. Before the ramp the control flags
+      ${Math.round(fc.paired_hours.control_pre_ramp_flag_rate * 100)}% of healthy hours (natural drift).</p>` : ""}
     </div></div>
-    <h3>False alerts</h3>${table([
+    <h3>False alerts</h3><p class="muted">Alerts on data with no fault: the healthy vessels from this run, and the injected vessel from its no-fault control, where every alert is false.</p>${table([
       { label: "Vessel", text: (x) => x.vessel_id }, { label: "Alerts", num: true, text: (x) => x.alerts },
       { label: "Running days", num: true, text: (x) => fmtNum(x.running_days, 1) },
       { label: "Per running day", num: true, text: (x) => fmtNum(x.per_running_day, 2) }], r.false_alerts ?? [])}
