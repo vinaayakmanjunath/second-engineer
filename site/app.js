@@ -185,8 +185,8 @@ async function initFleet() {
     // Live state is owned by gold (fleet.json); replay state is reconstructed client-side.
     const v = live
       ? { health: s.f.health_index, open: s.f.open_alerts, total: s.f.total_alerts, usd: s.f.usd_at_risk_open,
-          lag: `${fmtNum(s.f.freshness_lag_hours, 1)} h`, lagNote: "since last reading" }
-      : { ...s, lag: s.lagH == null ? "—" : `${fmtNum(s.lagH, 1)} h`, lagNote: "since last running hour" };
+          lag: `${fmtNum(s.f.freshness_lag_hours, 1)} h`, lagNote: "behind the newest batch in the fleet" }
+      : { ...s, lag: s.lagH == null ? "—" : `${fmtNum(s.lagH, 1)} h`, lagNote: "behind the replay time" };
     const [cls, word] = healthClass(v.health);
     return `<article class="card" data-vessel="${esc(s.f.vessel_id)}">
       <h3><a href="vessel.html?v=${encodeURIComponent(s.f.vessel_id)}">${esc(s.f.vessel_id)}</a></h3>

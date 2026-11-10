@@ -135,6 +135,6 @@ AI coding agents wrote much of the code. The commit history replays the build as
 (committed at the end; each phase passes lint and its own tests). Core modules (settings, mapping,
 simulator, injection, bronze/silver, evaluation helpers, API tenancy) have pytest unit tests; the
 gold layer has dbt schema, reconciliation and fault-match tests; evaluate and export are exercised
-by the full pipeline run in CI. After an independent review, the ingestion hardening (bad files,
+by the full pipeline run in CI. After a review by independent AI review agents, the ingestion hardening (bad files,
 crash safety, clock problems, strict config) was done test-first: each test failed before its fix.
 Every number shown is produced by the pipeline.
