@@ -48,12 +48,14 @@ function likelyCause(alert) {
 }
 
 // One alerts table for the fleet and vessel pages. The System column appears only when rows span several systems.
-function alertsTable(rows, { extra = [], ...opts } = {}) {
+// lead: columns before "Opened" (e.g. Vessel); extra: page-specific columns right after it.
+function alertsTable(rows, { lead = [], extra = [], ...opts } = {}) {
   const several = new Set(rows.map((a) => a.system)).size > 1;
   return table([
-    ...extra,
+    ...lead,
     ...(several ? [{ label: "System", text: (a) => a.system }] : []),
     { label: "Opened (UTC)", text: (a) => fmtTime(a.opened_at) },
+    ...extra,
     { label: "Status", html: (a) => ((a.open ?? a.status === "open") ? '<span class="status-open">open</span>' : "closed") },
     { label: "Severity", text: (a) => a.severity },
     { label: "Max |z|", num: true, text: (a) => fmtNum(a.max_abs_z, 1) },
@@ -248,7 +250,7 @@ async function initFleet() {
     $("#cards").innerHTML = state.map((s) => card(s, live)).join("");
     const recent = state.flatMap((s) => s.alerts).sort((a, b) => b.opened - a.opened);
     $("#alerts").innerHTML = alertsTable(recent.slice(0, 5), {
-      extra: [{ label: "Vessel", html: (a) => `<a href="vessel.html?v=${encodeURIComponent(a.vessel_id)}">${esc(a.vessel_id)}</a>` }],
+      lead: [{ label: "Vessel", html: (a) => `<a href="vessel.html?v=${encodeURIComponent(a.vessel_id)}">${esc(a.vessel_id)}</a>` }],
       empty: "No alerts opened yet at this time.",
       caption: `${Math.min(5, recent.length)} most recent of ${recent.length} alerts opened by ${fmtTime(T)} UTC; status as of that time. Click a cause for the top 3. $ is illustrative.`,
     });

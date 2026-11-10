@@ -107,7 +107,7 @@ td ol { margin: 0; padding-left: 1.1rem; }
 .status-open { color: var(--bad); font-weight: 600; }
 
 .chart { width: 100%; min-height: 60px; }
-.chart svg { max-width: 100%; height: auto; overflow: visible; }
+.chart svg { max-width: 100%; height: auto; overflow: visible; --plot-background: var(--panel); }  /* tooltips follow the theme */
 .chart figure { margin: 0; }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 1rem; margin: 0; font-size: 0.9rem; }
 .kv dt { color: var(--muted); }
