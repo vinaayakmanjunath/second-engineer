@@ -106,8 +106,9 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("bench", help="write docs/benchmarks.md (uses data/bench scratch dirs)")
     sub.add_parser("sensitivity", help="write docs/sensitivity.md: lead time vs fault severity (data/sensitivity)")
     sub.add_parser("run", help="download, simulate, ingest, silver, gold, evaluate, export")
-    api = sub.add_parser("api", help="serve the owner-scoped API")
-    api.add_argument("--port", type=int, default=8000)
+    sub.add_parser("publish", help="copy the served gold tables to Postgres (env PUBLISH_DATABASE_URL)")
+    api = sub.add_parser("api", help="serve the owner-scoped API (env DATABASE_URL, API_KEYS)")
+    api.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     a = p.parse_args(argv)
     s = settings.load()
 
@@ -151,6 +152,14 @@ def main(argv: list[str] | None = None) -> None:
         from secondeng import sensitivity
 
         sensitivity.write(s)
+    if a.cmd == "publish":
+        from secondeng import publish
+
+        url = os.environ.get("PUBLISH_DATABASE_URL")
+        if not url:
+            raise SystemExit("set PUBLISH_DATABASE_URL (the loader role's connection string)")
+        counts = publish.publish(s.path(s.warehouse), url)
+        print(json.dumps(lake.log_run(s.lake, "publish", tables=counts)))
     if a.cmd == "api":
         import uvicorn
 

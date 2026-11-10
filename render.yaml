@@ -1,0 +1,16 @@
+# Render Blueprint for the owner-scoped API (free plan; sleeps after 15 min idle, ~1 min to wake).
+# Secrets are prompted for in the Render dashboard on first deploy and never stored here.
+services:
+  - type: web
+    name: second-engineer-api
+    runtime: docker
+    plan: free
+    region: frankfurt          # same region as the Neon database
+    branch: main
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass   # deploy only after CI and the pipeline (which loads the data) pass
+    envVars:
+      - key: DATABASE_URL      # api_reader role, direct (non-pooled) endpoint, sslmode=require
+        sync: false
+      - key: API_KEYS          # JSON object: {"<key>": "owner_north", "<key>": "owner_south"}
+        sync: false
