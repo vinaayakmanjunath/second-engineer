@@ -1,7 +1,7 @@
 [project]
 name = "secondeng"
 version = "0.1.0"
-description = "Second Engineer: early engine-fault warnings from messy ship telemetry (open-data demo)"
+description = "Second Engineer: trusted data and explainable fault warnings from messy ship telemetry (open-data demo)"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "polars>=1.0",
