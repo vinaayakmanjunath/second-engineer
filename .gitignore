@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+data/
+landing/
+lake/
+*.duckdb
+*.duckdb.wal
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+logs/
+site/data/
+.env
+# agent / tooling files never go in the repo
+.hermes/
+AGENTS.md
+CLAUDE.md
+dbt/seeds/*.csv
