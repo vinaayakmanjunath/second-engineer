@@ -100,7 +100,7 @@ def vessel_alerts(vessel_id: str, who: Owner) -> list[dict]:
         for a in alerts:
             a["fault_match"] = _rows(
                 con,
-                "select fault, similarity, rank from mart_fault_match where alert_id = ? order by rank",
+                "select fault, similarity, rank, confident, margin from mart_fault_match where alert_id = ? order by rank",
                 [a["alert_id"]],
             )
         return alerts

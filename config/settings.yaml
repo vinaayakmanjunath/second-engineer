@@ -59,6 +59,7 @@ detection:
   alert_min_hours: 3              # flagged hours before an alert opens
   alert_close_hours: 3            # flagged hours further apart than this start a new alert
   health_k: 10                    # health = 100 - clamp(mean |z| * k)
+  match_min: 0.8                  # fault match below this cosine similarity = "no confident match"
 
 # Off-hire cost model: illustrative assumptions, not a pricing model; labelled so everywhere shown.
 cost_model:

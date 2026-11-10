@@ -4,7 +4,6 @@ import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6.16/+e
 
 const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
 const REPO_URL = "https://github.com/vinaayakmanjunath/second-engineer";
-const MATCH_MIN = 0.8; // top fault-match similarity below this is shown as "no confident match"
 const HOUR = 3600e3;
 const NAV = [["index.html", "Fleet"], ["vessel.html", "Vessel"], ["quality.html", "Data quality"], ["pipeline.html", "Pipeline"]];
 const BANNER = "Virtual vessels derived from one real ship (ARC Gloria) · fault injected into GLORIA-C main engine from a test-bench signature · demonstration, not validated";
@@ -41,9 +40,11 @@ function healthClass(h) {
 
 function likelyCause(alert, { full = false } = {}) {
   const m = alert.fault_match ?? [];
-  if (!m.length || m[0].similarity < MATCH_MIN) return "no confident match";
+  // gold decides confidence (mart_fault_match.confident); the page only displays it
+  if (!m.length || !m[0].confident) return "no confident match";
   if (!full) return `${esc(label(m[0].fault))} (${m[0].similarity.toFixed(2)})`;
-  return `<ol>${m.slice(0, 3).map((f) => `<li>${esc(label(f.fault))} <span class="muted">${f.similarity.toFixed(2)}</span></li>`).join("")}</ol>`;
+  const margin = m[0].margin == null ? "" : ` <span class="muted">· lead over #2: ${m[0].margin.toFixed(3)}</span>`;
+  return `<ol>${m.slice(0, 3).map((f) => `<li>${esc(label(f.fault))} <span class="muted">${f.similarity.toFixed(2)}</span></li>`).join("")}</ol>${margin}`;
 }
 
 // Columns: {label, text?: row => value (escaped), html?: row => trusted markup, num?: bool}
@@ -389,7 +390,7 @@ async function initVessel() {
       { label: "$ at risk (illustrative)", num: true, text: (a) => fmtUsd(a.usd_at_risk) },
     ], alerts.filter((a) => a.vessel_id === v).sort((a, b) => toDate(b.opened_at) - toDate(a.opened_at)), {
       empty: "No alerts for this vessel.",
-      caption: `Likely cause = top-3 bench fault signatures by similarity; below ${MATCH_MIN} shown as no confident match. $ at risk is illustrative (assumed off-hire event cost, not a pricing model). Shaded spans on the charts are alert windows.`,
+      caption: `Likely cause = top-3 bench fault signatures by cosine similarity; below ${run.settings.detection.match_min} shown as no confident match. A small lead over #2 means the top two faults look alike. $ at risk is illustrative (assumed off-hire event cost, not a pricing model). Shaded spans on the charts are alert windows.`,
     });
   }
   await refresh();

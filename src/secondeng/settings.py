@@ -72,6 +72,7 @@ class Detection(Model):
     alert_min_hours: int = Field(ge=1)
     alert_close_hours: int = Field(ge=1)
     health_k: float = Field(gt=0)
+    match_min: float = Field(ge=-1, le=1)
 
 
 class CostModel(Model):
