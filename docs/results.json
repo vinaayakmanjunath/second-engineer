@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-11-10T17:55:55Z",
+  "generated_utc": "2026-11-10T18:45:02Z",
   "injection": {
     "vessel_id": "GLORIA-C",
     "system": "ME",
@@ -41,7 +41,6 @@
       "neither": 30,
       "control_pre_ramp_flag_rate": 0.315
     },
-    "control_warehouse": "/Users/vinayakmanjunath/Documents/VHermes/Project/trident_demo/second-engineer/data/control/lake/wh.duckdb",
     "attributable_lead_time_hours": null,
     "verdict": "No lead time claimed: the no-fault control also opens an alert in the ramp window."
   },

@@ -25,7 +25,8 @@ flowchart LR
   SI --> DBT[dbt-duckdb GOLD<br/>1-min rollups, operating state,<br/>baselines, anomaly scores, alerts,<br/>fault match, DQ scorecard]
   B[Bench fault files] --> SIG[Fault signatures] --> DBT
   DBT --> EXP[export JSON] --> WEB[Static dashboard<br/>GitHub Pages]
-  DBT --> API[FastAPI<br/>owner-scoped API keys]
+  DBT --> PUB[publish<br/>atomic schema swap] --> PG[(Postgres on Neon<br/>serving schema)]
+  PG --> API[FastAPI on Render<br/>read-only role,<br/>owner-scoped API keys]
 ```
 
 ## What it does
@@ -41,7 +42,8 @@ flowchart LR
 | Silver | Parse, map, convert the ship clock to UTC, quarantine with a reason, dedupe on (vessel, sensor, ts), rewrite only touched vessel-day partitions atomically | `silver.py` |
 | Gold (dbt) | Incremental 1-min rollups, running state, speed-conditioned baselines, robust z, health index, alerts, fault match, DQ scorecard, illustrative $ at risk; schema, singular and reconciliation tests | `dbt/` |
 | Evaluate | Fault vs no-fault control, false alerts, transport mess injected vs handled | `evaluate.py` |
-| Serve | Static dashboard with a replay slider; FastAPI where each owner sees only their vessels | `site/`, `api.py` |
+| Publish | The tables the API serves are copied from DuckDB into Postgres (`serving` schema) and swapped in atomically; a failed load never touches what the API reads | `publish.py`, `deploy/neon_roles.sql` |
+| Serve | Static dashboard with a replay slider; FastAPI on a read-only Postgres role, where each owner sees only their vessels | `site/`, `api.py`, `render.yaml` |
 
 ## Results (from generated docs)
 
@@ -64,12 +66,12 @@ Transport noise is seeded per vessel, so the control is exactly paired with the 
 **False alerts** on data with no fault: 0.25 / 0.077 / 0.333 per running day (GLORIA-A / B / C;
 C is counted on its no-fault control, where every alert is false).
 
-**Pipeline performance** ([benchmarks.md](docs/benchmarks.md), Apple M1 Pro laptop). The bronze → silver → gold build takes 79.0 s, with silver parsing 82,179,168 readings at about 1.21 M readings/s
-(peak memory 4.7 GB, bounded by silver's chunk size). When one batch arrives late, silver rewrites
-**1 vessel-day partition** in 0.06 s, against 67.9 s for the full silver build. Re-running with nothing new processes 0 files, leaves the partition files untouched
+**Pipeline performance** ([benchmarks.md](docs/benchmarks.md), Apple M1 Pro laptop). The bronze → silver → gold build takes 79.4 s, with silver parsing 82,179,168 readings at about 1.19 M readings/s
+(peak memory 4.6 GiB). When one batch arrives late, silver rewrites
+**1 vessel-day partition** in 0.05 s, against 69.0 s for the full silver build. Re-running with nothing new processes 0 files, leaves the partition files untouched
 and gives **identical gold checksums**. Silver Parquet is **3.9× smaller** than the raw CSV
 (209.4 MB vs 811.1 MB). A week of hourly data takes 2.4 ms from the 1-minute rollup, against
-11.4 ms from raw silver.
+11.6 ms from raw silver.
 
 ## Quickstart
 
@@ -82,7 +84,14 @@ make run          # download, simulate, bronze, silver, dbt gold + tests, evalua
 make site-serve   # dashboard on http://localhost:8080
 make test lint    # pytest + ruff
 make bench sensitivity profile   # regenerate docs/benchmarks.md, docs/sensitivity.md, docs/data_profile.md
-API_KEYS='{"demo-north":"owner_north","demo-south":"owner_south"}' make api   # http://localhost:8000/docs
+```
+
+The API reads Postgres. With any Postgres you control (roles from `deploy/neon_roles.sql`):
+
+```bash
+PUBLISH_DATABASE_URL=postgresql://loader@localhost/db uv run secondeng publish
+DATABASE_URL=postgresql://api_reader@localhost/db \
+  API_KEYS='{"demo-north":"owner_north","demo-south":"owner_south"}' make api   # http://localhost:8000/docs
 ```
 
 Every step is also a subcommand: `uv run secondeng --help`.

@@ -100,7 +100,19 @@ where ingest and silver are sensors on new landing files. dbt owns gold, tests a
 Gold is exported to small JSON files (about 1 MB in total) and drawn with Observable Plot, pinned on
 jsDelivr. It is always on, free and has no server to wake up. I chose JSON over DuckDB-WASM because
 loading the WASM engine is a ~30 MB cold start, which is a real risk during a live screen share.
-The FastAPI service serves the same gold tables, scoped by owner.
+The API serves the same gold tables from Postgres (below).
+
+## Serving store: Postgres for the API, DuckDB for the batch
+DuckDB is a fast in-process engine with one writer: rebuilding gold locks the file, so an API reading
+it directly would go down on every run, and it has no roles. The pipeline therefore publishes the
+tables the API serves (`publish.SERVED`, the serving contract: exactly those columns) into a Postgres
+`serving` schema. DuckDB does the bulk copy; one Postgres transaction then swaps `serving_next` in,
+so a failed or cancelled load never changes what the API reads. Two roles: `loader` can only create
+and swap the serving schemas; `api_reader` is read-only with a 5 s statement timeout. The API runs
+on Render's free plan and the database on Neon's free plan, both in Frankfurt; both sleep when idle
+(the API takes about a minute to wake). Lake and warehouse stay the system of record: the serving
+copy can be rebuilt at any time. At fleet scale: managed Postgres or a time-series store, with
+row-level security instead of an owner check in code.
 
 ## API security
 An API key in `X-API-Key` maps to an owner (keys come from env, compared in constant time). Every

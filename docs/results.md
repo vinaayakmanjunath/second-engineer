@@ -1,6 +1,6 @@
 # Results (generated)
 
-_Generated 2026-11-10T17:55:55Z by `secondeng evaluate`. Do not edit by hand._
+_Generated 2026-11-10T18:45:02Z by `secondeng evaluate`. Do not edit by hand._
 
 ## Injected fault (ground truth, never read by the pipeline)
 

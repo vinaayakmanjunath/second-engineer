@@ -1,6 +1,6 @@
 # Sensitivity: detector response vs fault severity (generated)
 
-_Generated 2026-11-10 17:59 UTC by `secondeng sensitivity`._
+_Generated 2026-11-10 18:48 UTC by `secondeng sensitivity`._
 
 Vessel GLORIA-C, system ME, fault `air_cooler_fouling`, 96 h ramp. Severity = deviation at failure as a multiple of the deviation measured on the test bench. Severity 0 is the control (no fault): any alert there is a false alarm.
 

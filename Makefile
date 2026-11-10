@@ -1,4 +1,4 @@
-.PHONY: setup download profile simulate ingest silver gold evaluate export run test lint bench sensitivity api site-serve clean
+.PHONY: setup download profile simulate ingest silver gold evaluate export run test lint bench sensitivity publish api site-serve clean
 
 setup:        ## install pinned dependencies (uv.lock)
 	uv sync --frozen
@@ -28,7 +28,9 @@ bench:        ## docs/benchmarks.md (needs a completed run)
 	uv run secondeng bench
 sensitivity:  ## docs/sensitivity.md (5 re-runs of the injected vessel)
 	uv run secondeng sensitivity
-api:          ## owner-scoped API on :8000 (set API_KEYS='{"key": "owner_north"}')
+publish:      ## copy the served gold tables to Postgres (set PUBLISH_DATABASE_URL, loader role)
+	uv run secondeng publish
+api:          ## owner-scoped API on :8000 (set DATABASE_URL to the api_reader role, and API_KEYS)
 	uv run secondeng api
 site-serve:   ## dashboard on http://localhost:8080
 	cd site && python3 -m http.server 8080
