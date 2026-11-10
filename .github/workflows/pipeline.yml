@@ -5,8 +5,6 @@ on:
     branches: [main]
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -14,6 +12,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # loader role on the serving database; publishing is skipped until the secret exists
+      PUBLISH_DATABASE_URL: ${{ secrets.NEON_LOADER_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -28,6 +29,9 @@ jobs:
           key: zenodo-18330661-19857425-v1
       - name: Full pipeline (download, simulate, bronze, silver, dbt gold + tests, evaluate, export)
         run: uv run secondeng run
+      - name: Publish gold to the serving database (atomic schema swap)
+        if: github.ref == 'refs/heads/main' && env.PUBLISH_DATABASE_URL != ''
+        run: uv run secondeng publish
       - run: uv run secondeng profile
       - uses: actions/upload-artifact@v4
         with:
@@ -40,6 +44,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

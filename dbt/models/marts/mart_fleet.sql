@@ -9,7 +9,7 @@ alerts as (
     select vessel_id,
         count(*) filter (where status = 'open') as open_alerts,
         count(*) as total_alerts,
-        coalesce(sum(usd_at_risk) filter (where status = 'open'), 0) as usd_at_risk_open
+        coalesce(sum(usd_at_risk) filter (where status = 'open'), 0)::bigint as usd_at_risk_open
     from {{ ref('mart_alerts') }} group by all
 )
 select

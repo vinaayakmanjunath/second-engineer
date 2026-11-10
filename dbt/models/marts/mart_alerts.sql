@@ -61,5 +61,5 @@ select
     round({{ var('event_usd') }} * case severity
         when 'high' then {{ var('severity_weight')['high'] }}
         when 'medium' then {{ var('severity_weight')['medium'] }}
-        else {{ var('severity_weight')['low'] }} end, 0) as usd_at_risk
+        else {{ var('severity_weight')['low'] }} end, 0)::bigint as usd_at_risk
 from sev

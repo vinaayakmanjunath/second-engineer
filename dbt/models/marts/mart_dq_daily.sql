@@ -1,6 +1,6 @@
 -- Data-quality scorecard per vessel x UTC day.
 with pts as (
-    select vessel_id, cast(minute as date) as day, sum(n) as points_valid
+    select vessel_id, cast(minute as date) as day, (sum(n))::bigint as points_valid
     from {{ ref('mart_rollup_1min') }} group by all
 ),
 cover as (
@@ -9,12 +9,12 @@ cover as (
 ),
 q as (
     select vessel_id, cast(sent_hour as date) as day,
-        sum(n_rows) as points_quarantined,
-        sum(n_rows) filter (where reason = 'missing_value') as q_missing_value,
-        sum(n_rows) filter (where reason = 'bad_timestamp') as q_bad_timestamp,
-        sum(n_rows) filter (where reason = 'future_timestamp') as q_future_timestamp,
-        sum(n_rows) filter (where reason = 'out_of_range') as q_out_of_range,
-        sum(n_rows) filter (where reason = 'unknown_sensor') as q_unknown_sensor
+        (sum(n_rows))::bigint as points_quarantined,
+        (sum(n_rows) filter (where reason = 'missing_value'))::bigint as q_missing_value,
+        (sum(n_rows) filter (where reason = 'bad_timestamp'))::bigint as q_bad_timestamp,
+        (sum(n_rows) filter (where reason = 'future_timestamp'))::bigint as q_future_timestamp,
+        (sum(n_rows) filter (where reason = 'out_of_range'))::bigint as q_out_of_range,
+        (sum(n_rows) filter (where reason = 'unknown_sensor'))::bigint as q_unknown_sensor
     from {{ ref('stg_quarantine') }} group by all
 ),
 b as (
@@ -24,8 +24,8 @@ b as (
         count(*) filter (where status = 'duplicate_batch') as duplicate_batches,
         count(*) filter (where status = 'loaded' and sent_at - max_ts_utc > interval 1 hour) as late_batches,
         quantile_cont(epoch(sent_at - max_ts_utc) / 60.0, 0.95) filter (where status = 'loaded') as lateness_p95_min,
-        sum(out_of_order_rows) as out_of_order_rows,
-        sum(n_unmapped) as unmapped_points
+        (sum(out_of_order_rows))::bigint as out_of_order_rows,
+        (sum(n_unmapped))::bigint as unmapped_points
     from {{ ref('stg_batches') }} group by all
 ),
 dupf as (
