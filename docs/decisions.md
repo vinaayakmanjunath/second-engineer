@@ -110,7 +110,8 @@ tables the API serves (`publish.SERVED`, the serving contract: exactly those col
 so a failed or cancelled load never changes what the API reads. Two roles: `loader` can only create
 and swap the serving schemas; `api_reader` is read-only with a 5 s statement timeout. The API runs
 on Render's free plan and the database on Neon's free plan, both in Frankfurt; both sleep when idle
-(the API takes about a minute to wake). Lake and warehouse stay the system of record: the serving
+(the API takes about a minute to wake). The served copy is about 200 MB in Postgres, a fifth of
+Neon's free 1 GB, and loads in seconds. Lake and warehouse stay the system of record: the serving
 copy can be rebuilt at any time. At fleet scale: managed Postgres or a time-series store, with
 row-level security instead of an owner check in code.
 

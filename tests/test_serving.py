@@ -13,6 +13,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg.conninfo import make_conninfo
+from psycopg_pool import PoolTimeout
 
 from secondeng import publish
 from secondeng.settings import ROOT
@@ -196,4 +197,14 @@ def test_bad_api_keys_config_fails_at_startup(urls, monkeypatch):
     from secondeng.api import app
 
     with pytest.raises(RuntimeError, match="API_KEYS"), TestClient(app):
+        pass
+
+
+def test_unreachable_database_fails_at_startup(monkeypatch):
+    # a wrong DATABASE_URL must fail the deploy, not surface later as slow 500s
+    monkeypatch.setenv("DATABASE_URL", "postgresql://nobody@127.0.0.1:9/none?connect_timeout=1")
+    monkeypatch.setenv("API_KEYS", '{"k": "owner_north"}')
+    from secondeng.api import app
+
+    with pytest.raises(PoolTimeout), TestClient(app):
         pass

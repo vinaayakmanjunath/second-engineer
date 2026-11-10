@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
         kwargs={"row_factory": dict_row, "autocommit": True},
         check=ConnectionPool.check_connection,
     ) as pool:
+        pool.wait(timeout=10.0)  # a wrong or unreachable database fails the deploy here, not on a request
         app.state.pool = pool
         yield
 

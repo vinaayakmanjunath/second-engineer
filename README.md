@@ -10,6 +10,7 @@ fault dataset** (test bench). It is a demonstration, not a validated product: se
 [Honest scope](#honest-scope).
 
 - **Live dashboard:** https://vinaayakmanjunath.github.io/second-engineer/
+- **Live API (Swagger):** https://second-engineer-api.onrender.com/docs (owner API keys required; free plan, so the first request after 15 min idle takes about a minute)
 - **Results:** [docs/results.md](docs/results.md) · [docs/sensitivity.md](docs/sensitivity.md) · [docs/benchmarks.md](docs/benchmarks.md) · [docs/data_profile.md](docs/data_profile.md)
 - **Design decisions:** [docs/decisions.md](docs/decisions.md) · **Scaling to a real fleet:** [docs/scaling.md](docs/scaling.md)
 
