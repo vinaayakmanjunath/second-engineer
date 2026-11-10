@@ -1,0 +1,48 @@
+name: pipeline
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Cache Zenodo downloads (content is md5-verified on every run)
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: zenodo-18330661-19857425-v1
+      - name: Full pipeline (download, simulate, bronze, silver, dbt gold + tests, evaluate, export)
+        run: uv run secondeng run
+      - run: uv run secondeng profile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-docs
+          path: docs/*.md
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
