@@ -137,12 +137,11 @@ def paired_hours(fault_wh: Path, control_wh: Path, gt: dict, min_sensors: int) -
     }
 
 
-def fault_vs_control(s: Settings) -> dict:
+def fault_vs_control(s: Settings, cs: Settings) -> dict:
     """Same vessel and detector with and without the fault. Lead time is claimed only if the control is quiet.
 
     Transport noise is seeded per vessel id, so the control is exactly paired with the full run."""
     fault = window_metrics(s)
-    cs = isolated_run(s, 0.0, ROOT / "data" / "control")
     control = window_metrics(cs)
     claimed = control["alerts_opened_in_window"] == 0 and fault["alerts_opened_in_window"] > 0
     if claimed:
@@ -157,7 +156,6 @@ def fault_vs_control(s: Settings) -> dict:
         "paired_hours": paired_hours(
             s.path(s.warehouse), cs.path(cs.warehouse), ground_truth(s), s.detection.min_sensors
         ),
-        "control_warehouse": str(cs.path(cs.warehouse)),
         "attributable_lead_time_hours": fault["hours_before_failure"] if claimed else None,
         "verdict": verdict,
     }
@@ -255,7 +253,8 @@ def transport(s: Settings) -> list[dict]:
 
 def write(s: Settings) -> dict:
     gt = ground_truth(s)
-    fvc = fault_vs_control(s)
+    cs = isolated_run(s, 0.0, ROOT / "data" / "control")  # same vessel, no fault
+    fvc = fault_vs_control(s, cs)
     res = {
         "generated_utc": lake.now_utc().isoformat(timespec="seconds") + "Z",
         "injection": {
@@ -264,7 +263,7 @@ def write(s: Settings) -> dict:
         },
         "fault_vs_control": fvc,
         "min_sensors": s.detection.min_sensors,
-        "false_alerts": false_alerts(s.path(s.warehouse), Path(fvc["control_warehouse"]), gt["vessel_id"]),
+        "false_alerts": false_alerts(s.path(s.warehouse), cs.path(cs.warehouse), gt["vessel_id"]),
         "transport": transport(s),
     }
     docs = s.path(Path("docs"))

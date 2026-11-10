@@ -1,6 +1,7 @@
 """Bronze idempotency, silver dedupe / late data / ordering / quarantine."""
 
 import gzip
+import json
 from datetime import date, datetime
 
 import polars as pl
@@ -184,14 +185,15 @@ def test_clock_problems_are_quarantined_with_their_own_reason(s):
         line("GLORIA-A", "b1", sent, 2, "main_engine", "2026-10-25 01:00:00", rpm, [700.0], logger="nope_v9"),
         line("GLORIA-A", "b1", sent, 3, "main_engine", "1970-01-01 00:00:00", rpm, [700.0]),  # logger clock reset
         line("GLORIA-A", "b1", sent, 4, "main_engine", "2026-10-25 00:00:00", rpm, [700.0]),
+        line("GLORIA-A", "b1", sent, 5, "main_engine", "2026-10-25 01:00:00", rpm, [700.0], logger=None),
     ]
     write_batch(s.landing, "20261025T060000_b1.jsonl.gz", lines)
     bronze.ingest(s)
     r = silver.run(s)
-    q = silver.read_log(s, "quarantine")
+    q = silver.read_log(s, "quarantine").group_by("reason").agg(pl.col("n_rows").sum())
     assert dict(zip(q["reason"], q["n_rows"], strict=True)) == {
         "dst_transition": 2,
-        "unknown_logger": 1,
+        "unknown_logger": 2,
         "stale_timestamp": 1,
     }
     assert r["points_valid"] == 1
@@ -213,3 +215,40 @@ def test_newest_sent_version_of_a_reading_wins_regardless_of_arrival_order(s, mo
     silver.run(s)
     rpm = _points(s).filter(pl.col("sensor_id") == "me.speed_rpm")
     assert rpm["value"].to_list() == [710.0]
+
+
+def test_valid_json_that_cannot_be_used_isolates_its_file(s):
+    good = [("2026-09-01 10:00:00", [700.0, 70.0])]
+    _batch(s.landing, "20260901T151000_b1.jsonl.gz", "b1", "2026-09-01T15:10:00Z", good)
+    mismatched = line("GLORIA-A", "b2", "2026-09-01T16:10:00Z", 0, "main_engine", "2026-09-01 11:00:00", ME_TAGS, [1.0])
+    write_batch(s.landing, "20260901T161000_b2.jsonl.gz", [mismatched])  # 2 tags, 1 value
+    ok = line("GLORIA-A", "b3", "2026-09-01T17:10:00Z", 0, "main_engine", "2026-09-01 12:00:00", ME_TAGS, [1, 2])
+    later = line("GLORIA-A", "b3", "garbage", 1, "main_engine", "2026-09-01 12:00:01", ME_TAGS, [1, 2])
+    write_batch(s.landing, "20260901T171000_b3.jsonl.gz", [ok, later])  # header fine, a later line is not
+    bronze.ingest(s)
+    silver.run(s)
+    log = silver.read_log(s, "batches")
+    status = dict(zip(log["file_name"], log["status"], strict=True))
+    assert status["20260901T161000_b2.jsonl.gz"] == "unparseable"
+    assert status["20260901T171000_b3.jsonl.gz"] == "unparseable"
+    assert _points(s).height == 2
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        {"batch_id": "b2", "logger": "gloria_v1", "sent_at": "2026-09-01T16:10:00Z"},  # no vessel_id
+        ["not", "an", "object"],
+        {"vessel_id": "GLORIA-A", "batch_id": "b2", "logger": "gloria_v1", "sent_at": "yesterday"},
+    ],
+    ids=["missing_key", "json_array", "bad_sent_at"],
+)
+def test_unusable_header_is_corrupt_and_does_not_block_other_files(s, header):
+    good = _batch(
+        s.landing, "20260901T151000_b1.jsonl.gz", "b1", "2026-09-01T15:10:00Z", [("2026-09-01 10:00:00", [700.0, 70.0])]
+    )
+    bad = s.landing / "GLORIA-A" / "20260901T161000_b2.jsonl.gz"
+    bad.write_bytes(gzip.compress((json.dumps(header) + "\n").encode(), mtime=0))
+    bronze.ingest(s)
+    man = bronze.read_manifest(s)
+    assert dict(zip(man["file_name"], man["status"], strict=True)) == {good.name: "loaded", bad.name: "corrupt_file"}

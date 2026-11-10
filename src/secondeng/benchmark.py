@@ -104,7 +104,7 @@ def write(main: Settings) -> Path:
     full["bronze"], _ = _timed(lambda: bronze.ingest(s))
     full["silver"], sv = _timed(lambda: silver.run(s))
     # peak resident memory of this process so far = the full bronze + silver build (ru_maxrss: bytes on macOS)
-    peak_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (2**20 if platform.system() == "Darwin" else 2**10)
+    peak_mib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (2**20 if platform.system() == "Darwin" else 2**10)
     full["gold"], _ = _timed(lambda: gold(s, full_refresh=True))
 
     os.link(held, s.landing / held.parent.name / held.name)
@@ -175,8 +175,8 @@ def write(main: Settings) -> Path:
         f"- Full build: silver parsed {sv['points_valid'] + sv['points_quarantined']:,} readings in {sv['seconds']} s "
         f"(**{(sv['points_valid'] + sv['points_quarantined']) / sv['seconds']:,.0f} readings/s**), "
         f"{sv['partitions_rewritten']} vessel-day partitions written.",
-        f"- Peak memory of the full bronze + silver build: **{peak_mb:,.0f} MB** (resident, one process). Silver works "
-        f"in chunks of {silver.CHUNK_FILES} files, so peak memory follows chunk size, not total data volume.",
+        f"- Peak memory of the full bronze + silver build: **{peak_mib / 1024:.1f} GiB** (resident, one process; silver "
+        f"parses {silver.CHUNK_FILES} files per chunk).",
         f"- Late batch `{held.name}`: silver rewrote **{sv_inc['partitions_rewritten']} partition(s)** "
         f"({', '.join(sv_inc['partitions'])}); dbt rollup is incremental on the touched vessel-days.",
         "",

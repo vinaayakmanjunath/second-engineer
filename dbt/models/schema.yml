@@ -36,7 +36,14 @@ models:
   - name: mart_baselines
     columns:
       - name: sigma
+        description: Robust sigma used for z, = max(robust_sigma, sigma_floor_frac x |median|).
         tests: [not_null]
+      - name: robust_sigma
+        description: 1.4826 x MAD of the residuals over the baseline window.
+      - name: sigma_source
+        description: Which term set sigma, 'mad' or 'floor' (the floor binds for quantised or very steady sensors).
+      - name: n_hours
+        description: Running hours in the baseline window the line was fitted on.
   - name: mart_alerts
     columns:
       - name: alert_id
@@ -51,6 +58,12 @@ models:
               arguments: {values: [open, closed]}
   - name: mart_fault_match
     columns:
+      - name: similarity
+        description: Cosine similarity between the alert's median relative deviation and a bench fault signature.
+      - name: confident
+        description: similarity >= match_min; the only place this cut-off is applied (dashboard and API read it).
+      - name: margin
+        description: Rank-1 similarity minus rank-2 (rank 1 rows only); small = the top two faults look alike.
       - name: alert_id
         tests:
           - relationships:

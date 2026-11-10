@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 import shutil
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -38,10 +39,17 @@ def read_manifest(s: Settings) -> pl.DataFrame:
     return pl.read_parquet(p) if p.exists() else pl.DataFrame(schema=MANIFEST_SCHEMA)
 
 
+SENT_AT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
 def _header(raw: bytes) -> tuple[dict, int]:
+    """The batch envelope from the first line. Raises on anything unusable (the caller marks the
+    file corrupt): not gzip, no newline, not a JSON object, a missing key, an unparseable sent_at."""
     text = gzip.decompress(raw)
     first = json.loads(text[: text.index(b"\n")])
-    return first, text.count(b"\n")
+    head = {k: str(first[k]) for k in ("vessel_id", "batch_id", "logger", "sent_at")}
+    head["sent_at"] = datetime.strptime(head["sent_at"], SENT_AT_FORMAT)
+    return head, text.count(b"\n")
 
 
 def _keep(src: Path, dest: Path) -> None:
@@ -66,7 +74,7 @@ def ingest(s: Settings) -> dict:
         sha = hashlib.sha256(raw).hexdigest()
         try:
             head, n_lines = _header(raw)
-        except (OSError, EOFError, ValueError, KeyError):
+        except (OSError, EOFError, ValueError, KeyError, TypeError):
             dest = s.lake / "bronze" / "_rejected" / f.parent.name / f.name
             _keep(f, dest)
             new_rows.append(
@@ -96,12 +104,7 @@ def ingest(s: Settings) -> dict:
         seen_files.add(f.name)
         new_rows.append(row)
     if new_rows:
-        new = (
-            pl.DataFrame(new_rows, infer_schema_length=None)
-            .with_columns(pl.col("sent_at").str.to_datetime("%Y-%m-%dT%H:%M:%SZ", time_unit="us"))
-            .select(list(MANIFEST_SCHEMA))
-            .cast(MANIFEST_SCHEMA)
-        )
+        new = pl.DataFrame(new_rows, infer_schema_length=None).select(list(MANIFEST_SCHEMA)).cast(MANIFEST_SCHEMA)
         man = pl.concat([man, new])
         lake.write_parquet_atomic(man, manifest_path(s))
     counts = dict(pl.DataFrame(new_rows).group_by("status").len().iter_rows()) if new_rows else {}

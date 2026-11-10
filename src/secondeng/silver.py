@@ -13,6 +13,7 @@ crash re-processes the same files. Readers therefore take each file's latest rec
 from __future__ import annotations
 
 import gzip
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -98,6 +99,16 @@ def parse_ts(s: Settings) -> pl.Expr:
     return expr.otherwise(None).dt.replace_time_zone(None).alias("ts_utc")
 
 
+def _check_lines(lines: pl.DataFrame) -> None:
+    """Valid JSON can still be unusable: every line needs a parseable sent_at and one value per tag.
+    Raising here marks the whole file unparseable, so it cannot fail the rest of its chunk later."""
+    sent = lines["sent_at"].str.to_datetime(bronze.SENT_AT_FORMAT, strict=False)
+    if sent.null_count():
+        raise ValueError("line with a missing or unparseable sent_at")
+    if (lines["tags"].list.len() != lines["values"].list.len()).fill_null(True).any():
+        raise ValueError("line whose tags and values differ in length")
+
+
 EMPTY_LINES = {"line": pl.UInt32} | LINE_SCHEMA | {"file_name": pl.String}
 
 
@@ -108,12 +119,10 @@ def read_files(s: Settings, files: pl.DataFrame) -> tuple[pl.DataFrame, set[str]
     for fname, path in files.select("file_name", "bronze_path").iter_rows():
         try:
             raw = gzip.decompress((s.lake / path).read_bytes())
-            frames.append(
-                pl.read_ndjson(raw, schema=LINE_SCHEMA)
-                .with_row_index("line")
-                .with_columns(pl.lit(fname).alias("file_name"))
-            )
-        except (pl.exceptions.PolarsError, OSError, EOFError):
+            lines = pl.read_ndjson(raw, schema=LINE_SCHEMA)
+            _check_lines(lines)
+            frames.append(lines.with_row_index("line").with_columns(pl.lit(fname).alias("file_name")))
+        except (pl.exceptions.PolarsError, OSError, EOFError, ValueError):
             failed.add(fname)
     return (pl.concat(frames) if frames else pl.DataFrame(schema=EMPTY_LINES)), failed
 
@@ -123,14 +132,14 @@ def classify(s: Settings, lines: pl.DataFrame, tags: pl.DataFrame) -> pl.DataFra
     return (
         lines.with_columns(
             parse_ts(s),
-            pl.col("sent_at").str.to_datetime("%Y-%m-%dT%H:%M:%SZ", time_unit="us"),
+            pl.col("sent_at").str.to_datetime(bronze.SENT_AT_FORMAT, time_unit="us"),
         )
         .explode("tags", "values")
         .rename({"tags": "tag", "values": "raw_value"})
         .join(tags, on=["logger", "source", "tag"], how="left")
         .with_columns((pl.col("raw_value") * pl.col("scale") + pl.col("offset")).alias("value"))
         .with_columns(
-            pl.when(~pl.col("logger").is_in(list(s.loggers)))
+            pl.when(pl.col("logger").is_null() | ~pl.col("logger").is_in(list(s.loggers)))
             .then(pl.lit("unknown_logger"))
             .when(NAIVE_TS.is_null())
             .then(pl.lit("bad_timestamp"))
@@ -257,7 +266,8 @@ def run(s: Settings) -> dict:
             pl.col("ts").first().alias("sample_ts"),
             pl.col("raw_value").first().alias("sample_value"),
         )
-        part = f"part-{ingested_at:%Y%m%dT%H%M%S}-{i // CHUNK_FILES:04d}.parquet"
+        # unique per write: a crash and its re-run can start in the same second
+        part = f"part-{ingested_at:%Y%m%dT%H%M%S}-{i // CHUNK_FILES:04d}-{uuid.uuid4().hex[:8]}.parquet"
         lake.write_parquet_atomic(
             quarantine.with_columns(pl.lit(ingested_at).alias("ingested_at")), s.lake / "silver" / "quarantine" / part
         )
