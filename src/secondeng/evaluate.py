@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import duckdb
 import polars as pl
 
-from secondeng import bronze, lake
+from secondeng import bronze, lake, silver
 from secondeng.cli import build
 from secondeng.settings import ROOT, Settings
 
@@ -142,8 +142,8 @@ def transport(s: Settings) -> list[dict]:
     """What the simulator injected vs what the pipeline caught, per vessel."""
     sim = json.loads((s.landing / "_sim_log.json").read_text())["vessels"]
     man = bronze.read_manifest(s)
-    batches = pl.read_parquet(s.lake / "silver" / "batches" / "*.parquet").unique("file_name", keep="last")
-    q = pl.read_parquet(s.lake / "silver" / "quarantine" / "*.parquet")
+    batches = silver.read_log(s, "batches")
+    q = silver.read_log(s, "quarantine")
     valid = (
         pl.scan_parquet(s.lake / "silver" / "points" / "**" / "*.parquet", hive_partitioning=True)
         .group_by("vessel_id")

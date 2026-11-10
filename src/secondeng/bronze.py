@@ -44,7 +44,16 @@ def _header(raw: bytes) -> tuple[dict, int]:
     return first, text.count(b"\n")
 
 
+def _keep(src: Path, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name("." + dest.name)
+    shutil.copyfile(src, tmp)
+    tmp.rename(dest)
+
+
 def ingest(s: Settings) -> dict:
+    """Register every new landing file. A file that cannot be read (cut off in transit, not gzip,
+    no header) is kept under _rejected/ and recorded as corrupt_file; it never blocks other files."""
     man = read_manifest(s)
     seen_files = set(man["file_name"])
     seen_sha = set(man["sha256"])
@@ -55,7 +64,17 @@ def ingest(s: Settings) -> dict:
             continue
         raw = f.read_bytes()
         sha = hashlib.sha256(raw).hexdigest()
-        head, n_lines = _header(raw)
+        try:
+            head, n_lines = _header(raw)
+        except (OSError, EOFError, ValueError, KeyError):
+            dest = s.lake / "bronze" / "_rejected" / f.parent.name / f.name
+            _keep(f, dest)
+            new_rows.append(
+                {"file_name": f.name, "sha256": sha, "vessel_id": f.parent.name, "received_at": received}
+                | {"status": "corrupt_file", "bronze_path": str(dest.relative_to(s.lake))}
+            )
+            seen_files.add(f.name)
+            continue
         row = {
             "file_name": f.name,
             "sha256": sha,
@@ -71,17 +90,14 @@ def ingest(s: Settings) -> dict:
             row |= {"status": "duplicate_file", "bronze_path": None}
         else:
             dest = s.lake / "bronze" / f"vessel_id={head['vessel_id']}" / f"received_date={received:%Y-%m-%d}" / f.name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            tmp = dest.with_name("." + dest.name)
-            shutil.copyfile(f, tmp)
-            tmp.rename(dest)
+            _keep(f, dest)
             row |= {"status": "loaded", "bronze_path": str(dest.relative_to(s.lake))}
             seen_sha.add(sha)
         seen_files.add(f.name)
         new_rows.append(row)
     if new_rows:
         new = (
-            pl.DataFrame(new_rows)
+            pl.DataFrame(new_rows, infer_schema_length=None)
             .with_columns(pl.col("sent_at").str.to_datetime("%Y-%m-%dT%H:%M:%SZ", time_unit="us"))
             .select(list(MANIFEST_SCHEMA))
             .cast(MANIFEST_SCHEMA)

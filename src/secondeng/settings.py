@@ -8,24 +8,30 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-class Vessel(BaseModel):
+class Model(BaseModel):
+    """Strict base: a misspelt or unknown key in the YAML is an error, not a silent default."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class Vessel(Model):
     vessel_id: str
     owner: str
     logger: str
     legs: list[str] = Field(min_length=1)
 
 
-class Fleet(BaseModel):
+class Fleet(Model):
     replay_start: date
     vessels: list[Vessel]
 
 
-class Injection(BaseModel):
+class Injection(Model):
     vessel_id: str
     fault: str
     ramp_hours: float = Field(gt=0)
@@ -34,7 +40,7 @@ class Injection(BaseModel):
     noise_frac: float = Field(ge=0)
 
 
-class Simulator(BaseModel):
+class Simulator(Model):
     batch_minutes: int = Field(gt=0)
     duplicate_rate: float = Field(ge=0, le=1)
     late_rate: float = Field(ge=0, le=1)
@@ -45,8 +51,16 @@ class Simulator(BaseModel):
     outage_hours: tuple[float, float]
     send_delay_minutes: tuple[float, float]
 
+    @model_validator(mode="after")
+    def _ranges(self) -> Simulator:
+        for name in ("late_hours", "outage_hours", "send_delay_minutes"):
+            lo, hi = getattr(self, name)
+            if not 0 <= lo <= hi:
+                raise ValueError(f"{name} must be 0 <= low <= high, got {lo}, {hi}")
+        return self
 
-class Detection(BaseModel):
+
+class Detection(Model):
     running_frac_of_p99_rpm: float = Field(gt=0, lt=1)
     running_min_minutes: int = Field(ge=1)
     baseline_days: float = Field(gt=0)
@@ -60,7 +74,7 @@ class Detection(BaseModel):
     health_k: float = Field(gt=0)
 
 
-class CostModel(BaseModel):
+class CostModel(Model):
     offhire_usd: float
     opex_per_day_usd: float
     offhire_days: float
@@ -72,7 +86,7 @@ class CostModel(BaseModel):
         return self.offhire_usd + self.opex_per_day_usd * self.offhire_days + self.offhire_bunkers_usd
 
 
-class Sensor(BaseModel):
+class Sensor(Model):
     id: str
     system: str
     measurement: str
@@ -80,14 +94,27 @@ class Sensor(BaseModel):
     min: float
     max: float
 
+    @model_validator(mode="after")
+    def _range(self) -> Sensor:
+        if self.min >= self.max:
+            raise ValueError(f"{self.id}: min must be below max")
+        return self
 
-class Tag(BaseModel):
+
+class Tag(Model):
     sensor: str
     scale: float = 1.0
     offset: float = 0.0
 
+    @field_validator("scale")
+    @classmethod
+    def _scale(cls, v: float) -> float:
+        if v == 0:
+            raise ValueError("scale must be non-zero")
+        return v
 
-class Logger(BaseModel):
+
+class Logger(Model):
     timezone: str
     sources: dict[str, dict[str, Tag]]
 
@@ -97,7 +124,7 @@ class Logger(BaseModel):
         return self
 
 
-class Settings(BaseModel):
+class Settings(Model):
     seed: int
     raw_root: Path
     landing_root: Path
