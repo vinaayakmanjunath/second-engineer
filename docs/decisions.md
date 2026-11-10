@@ -38,15 +38,28 @@ dropped. GLORIA-B uses a simulated second logger (vendor tags, psi and °F, UTC 
 that the mapping round-trips (`tests/test_mapping.py`).
 
 ## Quarantine instead of drop
-Rows with a bad or future timestamp, an unknown tag, a missing value or an out-of-range value go to
-`silver/quarantine` with a reason, aggregated per vessel, hour, tag and reason. `evaluate`
-reconciles valid + quarantined readings against readings sent, per vessel.
+Rows go to `silver/quarantine` with one reason each, aggregated per file, vessel, hour, tag and
+reason: unknown logger, unparseable or blank timestamp, a local time that does not exist or occurs
+twice (DST change), a timestamp in the future or more than 30 days before it was sent (a logger
+clock reset), an unknown tag, a missing value, or an out-of-range value. `evaluate` reconciles
+valid + quarantined readings against readings sent, per vessel.
+A whole file that cannot be read (cut off in transit, not gzip) is kept under `bronze/_rejected/`
+as `corrupt_file`; one that cannot be parsed is logged `unparseable`. Neither blocks other files.
+
+## Crash safety
+Silver writes partitions, then the batch log and quarantine parts, and marks files done in the
+bronze manifest last. A crash in between re-processes the same files: points are deduped on
+(sensor, ts), and the logs are read as each file's latest record (`silver.read_log`,
+`stg_quarantine`, `stg_batches`), so nothing is counted twice. Two versions of one reading: the
+one the ship sent last wins, whatever order they arrived in.
 
 ## Normal model: a straight line against engine speed, plus a robust sigma
 Exhaust temperature on this engine follows rpm closely, so fixed thresholds or coarse load bands
-either miss faults or cry wolf. Per vessel and sensor, `value = a + b·rpm` is fitted on the first
-10 days of running, with sigma = 1.4826 × MAD of the residuals (floored at 1% of the median for
-quantised sensors). Constant-speed generators get a flat median baseline. An engine running at a
+either miss faults or cry wolf. Per vessel and sensor, `value = a + b·rpm` is fitted on the hours
+the engine was running in the 10 calendar days after it first ran (46 running hours for the
+GLORIA-C main engine), with sigma = 1.4826 × MAD of the residuals, floored at 1% of the median. The floor
+binds often (quantised or very steady sensors; `mart_baselines.sigma_source` says which); a
+per-sensor floor based on instrument resolution would be better than a percentage of °C. Constant-speed generators get a flat median baseline. An engine running at a
 speed outside the learned range is not scored, so the model never extrapolates. Seawater outlet
 temperature is not scored because it mostly follows the sea, not the engine.
 **Why not ML:** with one ship and no labelled failures, a model I can explain line by line is worth
@@ -65,7 +78,8 @@ separately (`sensitivity.md`) rather than tuned.
 ## Fault injection is a documented assumption, and every claim is checked against a control
 Fault direction comes from the bench: mean relative change per measurement between the
 pre-anomaly and anomaly segments. The bench faults are mild, so the main run injects 3× bench
-severity as the deviation at failure. `secondeng evaluate` always re-runs the same vessel with no
+severity as the deviation at failure. At 1× the fault is already visible hour by hour against the
+control (`sensitivity.md`), but the likely-cause ranking only comes out right from 3×. `secondeng evaluate` always re-runs the same vessel with no
 fault (the control) and reports both side by side. On this ship the control also raises alerts
 inside the ramp window, because exhaust temperatures drift naturally. So no lead time is claimed.
 What the fault measurably changes is how many hours are flagged, how high z peaks, and whether

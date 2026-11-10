@@ -43,6 +43,10 @@ resid as (
 )
 select f.vessel_id, f.sensor_id, f.system, f.measurement, f.speed_conditioned,
     f.intercept, f.slope, f.rpm_min, f.rpm_max, f.median_value, f.n_hours, f.ref_start, f.ref_end,
-    greatest(r.robust_sigma, {{ var('sigma_floor_frac') }} * abs(f.median_value)) as sigma
+    greatest(r.robust_sigma, {{ var('sigma_floor_frac') }} * abs(f.median_value)) as sigma,
+    r.robust_sigma,
+    -- which term set sigma: the floor binds when residuals are tiny or quantised
+    case when r.robust_sigma < {{ var('sigma_floor_frac') }} * abs(f.median_value) then 'floor' else 'mad' end
+        as sigma_source
 from fit f join resid r using (vessel_id, sensor_id)
 where greatest(r.robust_sigma, {{ var('sigma_floor_frac') }} * abs(f.median_value)) > 0

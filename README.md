@@ -47,27 +47,29 @@ flowchart LR
 
 **Data reliability** ([results.md](docs/results.md)). For every vessel, the simulator's injected
 problems reconcile exactly with what the pipeline caught. Identical re-sends were dropped at bronze
-(19 / 19 / 20) and re-sends with a new envelope at silver (19 / 14 / 24). Every blank and future
+(24 / 9 / 22) and re-sends with a new envelope at silver (23 / 11 / 15). Every blank and future
 timestamp was quarantined, and **valid + quarantined readings = readings sent** (34,354,734 /
 19,326,897 / 28,516,155).
 
 **Detection, compared with a no-fault control** ([results.md](docs/results.md), [sensitivity.md](docs/sensitivity.md)).
 The same vessel is re-run without the fault. Over the 96 h ramp at 3× bench severity, flagged
-hours are **38 vs 17** in the control, peak |z| is **15.16 vs 6.84**, and the strongest alert's
+hours are **38 vs 17** in the control, peak |z| is **15.15 vs 6.84**, and the strongest alert's
 top match is the injected fault (air-cooler fouling), against turbine degradation in the control.
-**No lead time is claimed.** This ship's exhaust temperatures drift naturally, and the control
-also opens alerts in the same window. Flagged hours rise with severity (17 / 35 / 37 / 38 / 41
-at 0× / 1× / 2× / 3× / 5×).
+Hour by hour, **22 hours are flagged only with the fault and 1 only in the control**; even at 1×
+bench severity it is 19 vs 1. **No lead time is claimed:** this ship's exhaust temperatures drift
+naturally, the control flags 32% of healthy hours before the ramp, and it also opens alerts in the
+window. Flagged hours rise with severity (17 / 35 / 37 / 38 / 41 at 0× / 1× / 2× / 3× / 5×).
+Transport noise is seeded per vessel, so the control is exactly paired with the full run.
 
-**False alerts** on data the injection does not explain: 0.25 / 0.077 / 0.208 per running day
-(GLORIA-A / B / C).
+**False alerts** on data with no fault: 0.25 / 0.077 / 0.333 per running day (GLORIA-A / B / C;
+C is counted on its no-fault control, where every alert is false).
 
-**Pipeline performance** ([benchmarks.md](docs/benchmarks.md), Apple M1 Pro laptop). The bronze → silver → gold build takes 70.2 s, with silver parsing 82,179,168 readings at about 1.36 M readings/s. When one
-batch arrives late, silver rewrites **1 vessel-day partition** in 0.06 s, against 60.4 s for the full
-silver build. Re-running with nothing new processes 0 files, leaves the partition files untouched
+**Pipeline performance** ([benchmarks.md](docs/benchmarks.md), Apple M1 Pro laptop). The bronze → silver → gold build takes 79.0 s, with silver parsing 82,179,168 readings at about 1.21 M readings/s
+(peak memory 4.7 GB, bounded by silver's chunk size). When one batch arrives late, silver rewrites
+**1 vessel-day partition** in 0.06 s, against 67.9 s for the full silver build. Re-running with nothing new processes 0 files, leaves the partition files untouched
 and gives **identical gold checksums**. Silver Parquet is **3.9× smaller** than the raw CSV
-(208.9 MB vs 811.1 MB). A week of hourly data takes 2.7 ms from the 1-minute rollup, against
-13.0 ms from raw silver.
+(209.4 MB vs 811.1 MB). A week of hourly data takes 2.4 ms from the 1-minute rollup, against
+11.4 ms from raw silver.
 
 ## Quickstart
 
@@ -113,12 +115,16 @@ Docker · GitHub Actions · GitHub Pages · Observable Plot
 
 Code: MIT ([LICENSE](LICENSE)).
 
-**How it was built.** From planning to development to deployment it followed one framework: a
-written spec and plan, then the build phases visible in the commit history, then CI and deployment.
-A human stayed in the loop to catch design and architecture faults; two examples:
+**How it was built.** One framework from planning to deployment: a written spec and plan, the build,
+then CI and deployment. A human stayed in the loop to catch design and architecture faults; two
+examples:
 - replacing coarse load-band baselines with a speed-conditioned model;
 - adding the no-fault control that changed what the results claim.
 
-AI coding agents wrote much of the code. Every module ships with unit tests (pytest), and gold has
-dbt schema and reconciliation tests. Every commit in the history passes lint and its own tests, and
-every number shown is produced by the pipeline.
+AI coding agents wrote much of the code. The commit history replays the build as reviewable phases
+(committed at the end; each phase passes lint and its own tests). Core modules (settings, mapping,
+simulator, injection, bronze/silver, evaluation helpers, API tenancy) have pytest unit tests; the
+gold layer has dbt schema, reconciliation and fault-match tests; evaluate and export are exercised
+by the full pipeline run in CI. After an independent review, the ingestion hardening (bad files,
+crash safety, clock problems, strict config) was done test-first: each test failed before its fix.
+Every number shown is produced by the pipeline.

@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-11-10T16:00:03Z",
+  "generated_utc": "2026-11-10T17:55:55Z",
   "injection": {
     "vessel_id": "GLORIA-C",
     "system": "ME",
@@ -16,7 +16,7 @@
       "first_opened_utc": "2026-09-23 19:00:00",
       "hours_before_failure": 66.7,
       "flagged_hours_in_window": 38,
-      "peak_abs_z_in_window": 15.16,
+      "peak_abs_z_in_window": 15.15,
       "strongest_alert_id": "GLORIA-C-ME-20260925T1700",
       "top_fault": "air_cooler_fouling",
       "injected_fault_rank": 1,
@@ -34,9 +34,18 @@
       "injected_fault_rank": 2,
       "alerts_before_ramp": 5
     },
+    "paired_hours": {
+      "both": 16,
+      "fault_only": 22,
+      "control_only": 1,
+      "neither": 30,
+      "control_pre_ramp_flag_rate": 0.315
+    },
+    "control_warehouse": "/Users/vinayakmanjunath/Documents/VHermes/Project/trident_demo/second-engineer/data/control/lake/wh.duckdb",
     "attributable_lead_time_hours": null,
     "verdict": "No lead time claimed: the no-fault control also opens an alert in the ramp window."
   },
+  "min_sensors": 3,
   "false_alerts": [
     {
       "vessel_id": "GLORIA-A",
@@ -52,38 +61,38 @@
     },
     {
       "vessel_id": "GLORIA-C",
-      "alerts": 5,
+      "alerts": 8,
       "running_days": 24,
-      "per_running_day": 0.208
+      "per_running_day": 0.333
     }
   ],
   "transport": [
     {
       "vessel_id": "GLORIA-A",
       "check": "identical re-sends dropped (sha256, bronze)",
-      "injected": 19,
-      "handled": 19,
+      "injected": 24,
+      "handled": 24,
       "match": true
     },
     {
       "vessel_id": "GLORIA-A",
       "check": "re-sends with new envelope dropped (batch_id, silver)",
-      "injected": 19,
-      "handled": 19,
+      "injected": 23,
+      "handled": 23,
       "match": true
     },
     {
       "vessel_id": "GLORIA-A",
       "check": "blank timestamps quarantined (readings)",
-      "injected": 8676,
-      "handled": 8676,
+      "injected": 9208,
+      "handled": 9208,
       "match": true
     },
     {
       "vessel_id": "GLORIA-A",
       "check": "future timestamps quarantined (readings)",
-      "injected": 9110,
-      "handled": 9110,
+      "injected": 8713,
+      "handled": 8713,
       "match": true
     },
     {
@@ -96,43 +105,43 @@
     {
       "vessel_id": "GLORIA-A",
       "check": "late or outage-delayed batches ingested (>1 h after data)",
-      "injected": 139,
-      "handled": 133,
+      "injected": 150,
+      "handled": 140,
       "match": null
     },
     {
       "vessel_id": "GLORIA-A",
       "check": "rows shuffled in transit / order breaks seen on arrival",
-      "injected": 49288,
-      "handled": 47190,
+      "injected": 49297,
+      "handled": 47134,
       "match": null
     },
     {
       "vessel_id": "GLORIA-B",
       "check": "identical re-sends dropped (sha256, bronze)",
-      "injected": 19,
-      "handled": 19,
+      "injected": 9,
+      "handled": 9,
       "match": true
     },
     {
       "vessel_id": "GLORIA-B",
       "check": "re-sends with new envelope dropped (batch_id, silver)",
-      "injected": 14,
-      "handled": 14,
+      "injected": 11,
+      "handled": 11,
       "match": true
     },
     {
       "vessel_id": "GLORIA-B",
       "check": "blank timestamps quarantined (readings)",
-      "injected": 4576,
-      "handled": 4576,
+      "injected": 4857,
+      "handled": 4857,
       "match": true
     },
     {
       "vessel_id": "GLORIA-B",
       "check": "future timestamps quarantined (readings)",
-      "injected": 4715,
-      "handled": 4715,
+      "injected": 5190,
+      "handled": 5190,
       "match": true
     },
     {
@@ -145,43 +154,43 @@
     {
       "vessel_id": "GLORIA-B",
       "check": "late or outage-delayed batches ingested (>1 h after data)",
-      "injected": 51,
-      "handled": 51,
+      "injected": 57,
+      "handled": 57,
       "match": null
     },
     {
       "vessel_id": "GLORIA-B",
       "check": "rows shuffled in transit / order breaks seen on arrival",
-      "injected": 27483,
-      "handled": 26290,
+      "injected": 27387,
+      "handled": 26234,
       "match": null
     },
     {
       "vessel_id": "GLORIA-C",
       "check": "identical re-sends dropped (sha256, bronze)",
-      "injected": 20,
-      "handled": 20,
+      "injected": 22,
+      "handled": 22,
       "match": true
     },
     {
       "vessel_id": "GLORIA-C",
       "check": "re-sends with new envelope dropped (batch_id, silver)",
-      "injected": 24,
-      "handled": 24,
+      "injected": 15,
+      "handled": 15,
       "match": true
     },
     {
       "vessel_id": "GLORIA-C",
       "check": "blank timestamps quarantined (readings)",
-      "injected": 6883,
-      "handled": 6883,
+      "injected": 7134,
+      "handled": 7134,
       "match": true
     },
     {
       "vessel_id": "GLORIA-C",
       "check": "future timestamps quarantined (readings)",
-      "injected": 7246,
-      "handled": 7246,
+      "injected": 7108,
+      "handled": 7108,
       "match": true
     },
     {
@@ -194,15 +203,15 @@
     {
       "vessel_id": "GLORIA-C",
       "check": "late or outage-delayed batches ingested (>1 h after data)",
-      "injected": 142,
-      "handled": 134,
+      "injected": 176,
+      "handled": 162,
       "match": null
     },
     {
       "vessel_id": "GLORIA-C",
       "check": "rows shuffled in transit / order breaks seen on arrival",
-      "injected": 45518,
-      "handled": 43206,
+      "injected": 45849,
+      "handled": 43574,
       "match": null
     }
   ]

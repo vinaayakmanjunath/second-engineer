@@ -1,0 +1,32 @@
+version: 2
+
+exposures:
+  - name: dashboard
+    label: Static fleet dashboard (GitHub Pages)
+    type: dashboard
+    maturity: medium
+    url: https://vinaayakmanjunath.github.io/second-engineer/
+    description: JSON exported by src/secondeng/export.py, rendered by site/app.js.
+    owner: {name: Vinayak Manjunath}
+    depends_on:
+      - ref('mart_fleet')
+      - ref('mart_alerts')
+      - ref('mart_fault_match')
+      - ref('mart_system_health')
+      - ref('mart_baselines')
+      - ref('mart_dq_daily')
+      - ref('mart_rollup_1min')
+
+  - name: owner_api
+    label: Owner-scoped read API (FastAPI)
+    type: application
+    maturity: medium
+    description: src/secondeng/api.py; every vessel endpoint checks the caller owns the vessel.
+    owner: {name: Vinayak Manjunath}
+    depends_on:
+      - ref('mart_fleet')
+      - ref('mart_alerts')
+      - ref('mart_fault_match')
+      - ref('mart_system_health')
+      - ref('mart_dq_daily')
+      - ref('mart_rollup_1min')
