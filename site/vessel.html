@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Vessel detail · Second Engineer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body data-page="vessel">
+  <main id="main" class="inner">
+    <h1>Vessel detail</h1>
+
+    <section aria-label="Selection">
+      <div class="controls">
+        <label>Vessel <select id="sel-vessel"></select></label>
+        <label>System <select id="sel-system"></select></label>
+        <label>Sensor <select id="sel-sensor"></select></label>
+      </div>
+      <p id="sensor-meta" class="muted"></p>
+    </section>
+
+    <section aria-labelledby="value-title">
+      <h2 id="value-title">Sensor value</h2>
+      <p class="muted">Solid: hourly value · dashed: expected from baseline · band: expected ± 3σ · shaded: alert windows. Times UTC.</p>
+      <div id="value-chart" class="chart" role="img" aria-label="Hourly sensor value with expected line and plus or minus 3 sigma band"></div>
+    </section>
+
+    <section id="z-section" aria-labelledby="z-title">
+      <h2 id="z-title">Robust z-score</h2>
+      <p class="muted">z = (value − expected) / σ; dashed lines at |z| = 3 threshold.</p>
+      <div id="z-chart" class="chart" role="img" aria-label="Hourly robust z-score with threshold lines"></div>
+    </section>
+
+    <section aria-labelledby="health-title">
+      <h2 id="health-title">System health</h2>
+      <div id="health-chart" class="chart" role="img" aria-label="Hourly health index for the selected system"></div>
+    </section>
+
+    <section aria-labelledby="vessel-alerts-title">
+      <h2 id="vessel-alerts-title">Alerts</h2>
+      <div id="vessel-alerts"></div>
+    </section>
+  </main>
+</body>
+</html>

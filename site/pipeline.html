@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Pipeline · Second Engineer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body data-page="pipeline">
+  <main id="main" class="inner">
+    <h1>Pipeline</h1>
+
+    <section aria-labelledby="arch-h">
+      <h2 id="arch-h">Architecture</h2>
+      <pre class="mermaid" aria-label="Pipeline architecture diagram">
+flowchart TD
+  sim["Ship-to-shore simulator<br/>late · duplicate · out-of-order batches<br/>outages · corrupt timestamps"]
+  landing["Landing<br/>batch files"]
+  bronze["Bronze<br/>raw files + sha256 manifest"]
+  silver["Silver<br/>UTC · canonical sensors · dedupe<br/>quarantine · incremental partitions"]
+  gold["dbt gold<br/>rollups · operating state · baselines<br/>anomaly scores · alerts · fault match · DQ"]
+  export["Export<br/>dashboard JSON"]
+  site["This site"]
+  api["FastAPI"]
+  sim --> landing --> bronze --> silver --> gold --> export
+  export --> site
+  export --> api
+      </pre>
+      <p>Source: <a id="repo-link" href="https://github.com/vinaayakmanjunath/second-engineer">github.com/vinaayakmanjunath/second-engineer</a></p>
+    </section>
+
+    <section aria-labelledby="run-h">
+      <h2 id="run-h">Last run</h2>
+      <div id="run-meta"></div>
+      <div id="run-steps"></div>
+    </section>
+
+    <div class="grid2">
+      <section aria-labelledby="det-h">
+        <h2 id="det-h">Detection settings</h2>
+        <p class="muted">Per vessel × sensor straight-line baseline vs engine rpm, learned on the first days of running; robust z per running hour; alert when enough sensors of one system exceed the threshold for enough flagged hours.</p>
+        <div id="set-detection"></div>
+      </section>
+      <section aria-labelledby="inj-h">
+        <h2 id="inj-h">Fault injection</h2>
+        <div id="set-injection"></div>
+        <p id="set-cost" class="muted"></p>
+      </section>
+      <section aria-labelledby="simset-h">
+        <h2 id="simset-h">Transport simulator</h2>
+        <div id="set-simulator"></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

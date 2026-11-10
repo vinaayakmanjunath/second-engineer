@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Fleet overview · Second Engineer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body data-page="fleet">
+  <main id="main" class="inner">
+    <h1>Fleet overview</h1>
+
+    <section class="replay" aria-labelledby="replay-h">
+      <h2 id="replay-h">Replay</h2>
+      <label for="replay">As-of time (UTC) — drag to replay the fleet state hour by hour</label>
+      <input id="replay" type="range" aria-describedby="replay-mode">
+      <div class="row">
+        <output id="replay-time" for="replay"></output>
+        <span id="replay-mode" class="muted"></span>
+        <button id="live-btn" type="button">Jump to live</button>
+      </div>
+      <small>Range <span id="replay-range"></span></small>
+    </section>
+
+    <section aria-labelledby="cards-h">
+      <h2 id="cards-h">Vessels</h2>
+      <div id="cards" class="cards"></div>
+    </section>
+
+    <section aria-labelledby="chart-h">
+      <h2 id="chart-h">Main engine health by vessel, hourly (UTC)</h2>
+      <p class="muted">Running hours only; gaps are engine off or no data. Faded lines lie after the replay time.</p>
+      <div id="fleet-chart" class="chart" role="img" aria-label="Line chart of hourly main engine health index per vessel"></div>
+    </section>
+
+    <section aria-labelledby="alerts-h">
+      <h2 id="alerts-h">Recent alerts</h2>
+      <div id="alerts"></div>
+    </section>
+
+    <section aria-labelledby="results-h">
+      <h2 id="results-h">Injected-fault evaluation</h2>
+      <div id="results"></div>
+    </section>
+  </main>
+</body>
+</html>

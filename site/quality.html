@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Data quality · Second Engineer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body data-page="quality">
+  <main id="main" class="inner">
+    <h1>Data quality</h1>
+
+    <section aria-labelledby="vol-h">
+      <h2 id="vol-h">Points and quarantine, per vessel</h2>
+      <div id="dq-volume"></div>
+    </section>
+
+    <section aria-labelledby="tr-h">
+      <h2 id="tr-h">Transport handling, per vessel</h2>
+      <div id="dq-transport"></div>
+    </section>
+
+    <div class="grid2">
+      <section aria-labelledby="inj-h">
+        <h2 id="inj-h">Injected by the ship-to-shore simulator</h2>
+        <div id="sim-injected"></div>
+      </section>
+      <section aria-labelledby="hand-h">
+        <h2 id="hand-h">Handled by the pipeline</h2>
+        <div id="sim-handled"></div>
+      </section>
+    </div>
+
+    <section aria-labelledby="heat-h">
+      <h2 id="heat-h">Daily data quality (UTC days)</h2>
+      <div class="controls">
+        <label>Metric <select id="dq-metric"></select></label>
+      </div>
+      <div id="dq-heatmap" class="chart" role="img" aria-label="Heatmap of the selected daily data-quality metric by vessel and day"></div>
+      <details>
+        <summary>Per-day table</summary>
+        <div id="dq-daily"></div>
+      </details>
+    </section>
+  </main>
+</body>
+</html>
