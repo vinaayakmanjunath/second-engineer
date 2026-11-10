@@ -16,6 +16,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 from fastapi.security import APIKeyHeader
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -87,6 +88,11 @@ def _authorise(request: Request, vessel_id: str, who: str) -> None:
 def _utc(t: datetime) -> datetime:
     """Timestamps are stored as naive UTC: treat a naive input as UTC, convert a zoned one."""
     return t if t.tzinfo is None else t.astimezone(UTC).replace(tzinfo=None)
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse("/docs")
 
 
 @app.get("/health")

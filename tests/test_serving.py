@@ -208,3 +208,8 @@ def test_unreachable_database_fails_at_startup(monkeypatch):
 
     with pytest.raises(PoolTimeout), TestClient(app):
         pass
+
+
+def test_root_sends_visitors_to_the_interactive_docs(client):
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (307, 308) and r.headers["location"] == "/docs"
