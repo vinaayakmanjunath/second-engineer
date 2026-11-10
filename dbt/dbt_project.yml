@@ -1,0 +1,21 @@
+name: second_engineer
+version: "1.0"
+config-version: 2
+profile: second_engineer
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: target
+clean-targets: [target]
+
+# All vars are passed by `secondeng gold` from config/settings.yaml (single source of truth).
+models:
+  second_engineer:
+    staging: {+materialized: view}
+    intermediate: {+materialized: table}
+    marts: {+materialized: table}
+seeds:
+  second_engineer:
+    fault_signatures:
+      +column_types:
+        rel_dev: double

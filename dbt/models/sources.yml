@@ -1,0 +1,23 @@
+version: 2
+sources:
+  - name: silver
+    description: Silver layer written by secondeng (Parquet, hive-partitioned).
+    tables:
+      - name: points
+        description: One row per valid reading (vessel_id, date partitions).
+        meta:
+          external_location: "read_parquet('{{ env_var('SECONDENG_LAKE') }}/silver/points/*/*/*.parquet', hive_partitioning = true)"
+      - name: batches
+        description: One row per bronze file processed by silver (status loaded | duplicate_batch).
+        meta:
+          external_location: "read_parquet('{{ env_var('SECONDENG_LAKE') }}/silver/batches/*.parquet')"
+      - name: quarantine
+        description: Rejected readings, aggregated per vessel / arrival hour / tag / reason.
+        meta:
+          external_location: "read_parquet('{{ env_var('SECONDENG_LAKE') }}/silver/quarantine/*.parquet')"
+  - name: bronze
+    tables:
+      - name: manifest
+        description: One row per landed file with sha256 and status (loaded | duplicate_file).
+        meta:
+          external_location: "read_parquet('{{ env_var('SECONDENG_LAKE') }}/bronze/_manifest.parquet')"

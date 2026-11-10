@@ -1,0 +1,61 @@
+version: 2
+seeds:
+  - name: sensor_registry
+    description: Canonical sensors (generated from config/sensors.yaml).
+    columns:
+      - name: sensor_id
+        tests: [unique, not_null]
+  - name: fleet
+    description: Virtual vessels and owners (generated from config/settings.yaml).
+    columns:
+      - name: vessel_id
+        tests: [unique, not_null]
+  - name: fault_signatures
+    description: Bench fault signatures, mean relative deviation per measurement (generated).
+
+models:
+  - name: stg_points
+    columns:
+      - name: sensor_id
+        tests:
+          - relationships:
+              arguments: {to: ref('sensor_registry'), field: sensor_id}
+      - name: ts_utc
+        tests: [not_null]
+  - name: mart_rollup_1min
+    description: 1-minute min/mean/max/count per vessel x sensor (incremental).
+    columns:
+      - name: minute
+        tests: [not_null]
+  - name: int_operating_state
+    columns:
+      - name: state
+        tests:
+          - accepted_values:
+              arguments: {values: [running, idle, 'off']}
+  - name: mart_baselines
+    columns:
+      - name: sigma
+        tests: [not_null]
+  - name: mart_alerts
+    columns:
+      - name: alert_id
+        tests: [unique, not_null]
+      - name: severity
+        tests:
+          - accepted_values:
+              arguments: {values: [high, medium, low]}
+      - name: status
+        tests:
+          - accepted_values:
+              arguments: {values: [open, closed]}
+  - name: mart_fault_match
+    columns:
+      - name: alert_id
+        tests:
+          - relationships:
+              arguments: {to: ref('mart_alerts'), field: alert_id}
+  - name: mart_fleet
+    columns:
+      - name: vessel_id
+        tests: [unique, not_null]

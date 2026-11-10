@@ -1,0 +1,7 @@
+second_engineer:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('SECONDENG_WAREHOUSE') }}"
+      threads: 4
