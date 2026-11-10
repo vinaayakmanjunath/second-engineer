@@ -1,0 +1,97 @@
+# Canonical machinery model ("vessel sensor assignment").
+# registry: one row per canonical sensor. loggers: raw tag -> canonical sensor, value*scale+offset.
+registry:
+  - {id: me.speed_rpm,        system: ME,  measurement: speed,          unit: rpm,  min: 0,   max: 1200}
+  - {id: me.lo_press_bar,     system: ME,  measurement: lo_press,       unit: bar,  min: 0,   max: 10}
+  - {id: me.lo_temp_c,        system: ME,  measurement: lo_temp,        unit: degC, min: 0,   max: 150}
+  - {id: me.fw_temp_c,        system: ME,  measurement: fw_temp,        unit: degC, min: 0,   max: 150}
+  - {id: me.sw_out_temp_c,    system: ME,  measurement: sw_out_temp,    unit: degC, min: 0,   max: 100}
+  - {id: me.exh_temp_cyl1_c,  system: ME,  measurement: exh_temp,       unit: degC, min: 0,   max: 800}
+  - {id: me.exh_temp_cyl2_c,  system: ME,  measurement: exh_temp,       unit: degC, min: 0,   max: 800}
+  - {id: me.exh_temp_cyl3_c,  system: ME,  measurement: exh_temp,       unit: degC, min: 0,   max: 800}
+  - {id: me.exh_temp_cyl4_c,  system: ME,  measurement: exh_temp,       unit: degC, min: 0,   max: 800}
+  - {id: me.exh_temp_cyl5_c,  system: ME,  measurement: exh_temp,       unit: degC, min: 0,   max: 800}
+  - {id: me.exh_temp_cyl6_c,  system: ME,  measurement: exh_temp,       unit: degC, min: 0,   max: 800}
+  - {id: me.charge_air_press_bar, system: ME, measurement: charge_air_press, unit: bar, min: 0, max: 6}
+  - {id: dg1.speed_rpm,       system: DG1, measurement: speed,          unit: rpm,  min: 0,   max: 2500}
+  - {id: dg1.lo_press_bar,    system: DG1, measurement: lo_press,       unit: bar,  min: 0,   max: 10}
+  - {id: dg1.fuel_press_bar,  system: DG1, measurement: fuel_press,     unit: bar,  min: 0,   max: 15}
+  - {id: dg1.fw_temp_c,       system: DG1, measurement: fw_temp,        unit: degC, min: 0,   max: 150}
+  - {id: dg1.lo_temp_c,       system: DG1, measurement: lo_temp,        unit: degC, min: 0,   max: 150}
+  - {id: dg1.sw_out_temp_c,   system: DG1, measurement: sw_out_temp,    unit: degC, min: 0,   max: 100}
+  - {id: dg2.speed_rpm,       system: DG2, measurement: speed,          unit: rpm,  min: 0,   max: 2500}
+  - {id: dg2.lo_press_bar,    system: DG2, measurement: lo_press,       unit: bar,  min: 0,   max: 10}
+  - {id: dg2.fuel_press_bar,  system: DG2, measurement: fuel_press,     unit: bar,  min: 0,   max: 15}
+  - {id: dg2.lo_temp_c,       system: DG2, measurement: lo_temp,        unit: degC, min: 0,   max: 150}
+
+loggers:
+  # ARC Gloria export as published (vendor A): local ship time, metric units.
+  gloria_v1:
+    timezone: America/Bogota
+    sources:
+      main_engine:
+        engine_rpm: {sensor: me.speed_rpm}
+        oil_pressure_bar: {sensor: me.lo_press_bar}
+        oil_temp_c: {sensor: me.lo_temp_c}
+        freshwater_temp_c: {sensor: me.fw_temp_c}
+        seawater_outlet_temp_c: {sensor: me.sw_out_temp_c}
+        cyl_1_temp_c: {sensor: me.exh_temp_cyl1_c}
+        cyl_2_temp_c: {sensor: me.exh_temp_cyl2_c}
+        cyl_3_temp_c: {sensor: me.exh_temp_cyl3_c}
+        cyl_4_temp_c: {sensor: me.exh_temp_cyl4_c}
+        cyl_5_temp_c: {sensor: me.exh_temp_cyl5_c}
+        cyl_6_temp_c: {sensor: me.exh_temp_cyl6_c}
+      generator_port:
+        generator_speed_rpm: {sensor: dg1.speed_rpm}
+        oil_pressure_bar: {sensor: dg1.lo_press_bar}
+        fuel_pressure_bar: {sensor: dg1.fuel_press_bar}
+        freshwater_temperature_c: {sensor: dg1.fw_temp_c}
+        oil_temperature_c: {sensor: dg1.lo_temp_c}
+        seawater_outlet_temperature_c: {sensor: dg1.sw_out_temp_c}
+      generator_starboard:
+        generator_speed_rpm: {sensor: dg2.speed_rpm}
+        oil_pressure_bar: {sensor: dg2.lo_press_bar}
+        fuel_pressure_bar: {sensor: dg2.fuel_press_bar}
+        oil_temperature_c: {sensor: dg2.lo_temp_c}
+
+  # Simulated second logger (same ship data re-labelled): UTC clock, psi and degF, vendor tags.
+  gloria_v2:
+    timezone: UTC
+    sources:
+      main_engine:
+        ME_SPEED: {sensor: me.speed_rpm}
+        ME_LO_P_PSI: {sensor: me.lo_press_bar, scale: 0.0689476}
+        ME_LO_T_F: {sensor: me.lo_temp_c, scale: 0.5555556, offset: -17.7777778}
+        ME_HT_CW_T_F: {sensor: me.fw_temp_c, scale: 0.5555556, offset: -17.7777778}
+        ME_SW_OUT_T_F: {sensor: me.sw_out_temp_c, scale: 0.5555556, offset: -17.7777778}
+        ME_EXH_T1_F: {sensor: me.exh_temp_cyl1_c, scale: 0.5555556, offset: -17.7777778}
+        ME_EXH_T2_F: {sensor: me.exh_temp_cyl2_c, scale: 0.5555556, offset: -17.7777778}
+        ME_EXH_T3_F: {sensor: me.exh_temp_cyl3_c, scale: 0.5555556, offset: -17.7777778}
+        ME_EXH_T4_F: {sensor: me.exh_temp_cyl4_c, scale: 0.5555556, offset: -17.7777778}
+        ME_EXH_T5_F: {sensor: me.exh_temp_cyl5_c, scale: 0.5555556, offset: -17.7777778}
+        ME_EXH_T6_F: {sensor: me.exh_temp_cyl6_c, scale: 0.5555556, offset: -17.7777778}
+      generator_port:
+        DG1_SPEED: {sensor: dg1.speed_rpm}
+        DG1_LO_P_PSI: {sensor: dg1.lo_press_bar, scale: 0.0689476}
+        DG1_FO_P_PSI: {sensor: dg1.fuel_press_bar, scale: 0.0689476}
+        DG1_HT_CW_T_F: {sensor: dg1.fw_temp_c, scale: 0.5555556, offset: -17.7777778}
+        DG1_LO_T_F: {sensor: dg1.lo_temp_c, scale: 0.5555556, offset: -17.7777778}
+        DG1_SW_OUT_T_F: {sensor: dg1.sw_out_temp_c, scale: 0.5555556, offset: -17.7777778}
+      generator_starboard:
+        DG2_SPEED: {sensor: dg2.speed_rpm}
+        DG2_LO_P_PSI: {sensor: dg2.lo_press_bar, scale: 0.0689476}
+        DG2_FO_P_PSI: {sensor: dg2.fuel_press_bar, scale: 0.0689476}
+        DG2_LO_T_F: {sensor: dg2.lo_temp_c, scale: 0.5555556, offset: -17.7777778}
+
+  # Matsui MU323DGSC test bench (vendor B): 3-cylinder, kgf/cm2. Used for fault signatures only.
+  bench:
+    timezone: UTC
+    sources:
+      test_bench:
+        Engine Speed: {sensor: me.speed_rpm}
+        LO Temp. Engine Out: {sensor: me.lo_temp_c}
+        Cooling Water Temp. Engine Out I: {sensor: me.fw_temp_c}
+        No.1 Exh.Gas Temp.: {sensor: me.exh_temp_cyl1_c}
+        No.2 Exh.Gas Temp.: {sensor: me.exh_temp_cyl2_c}
+        No.3 Exh.Gas Temp.: {sensor: me.exh_temp_cyl3_c}
+        Charge Air Press.: {sensor: me.charge_air_press_bar, scale: 0.980665}
