@@ -111,5 +111,14 @@ downloaded at run time and not stored in this repo; see [DATA_LICENSES.md](DATA_
 Python 3.11 · Polars · pydantic · DuckDB · Parquet · dbt-duckdb · FastAPI · pytest · ruff · uv ·
 Docker · GitHub Actions · GitHub Pages · Observable Plot
 
-Code: MIT ([LICENSE](LICENSE)). Built in about a day and a half with heavy use of AI coding
-agents. Every result is produced by the pipeline and checked by tests.
+Code: MIT ([LICENSE](LICENSE)).
+
+**How it was built.** From planning to development to deployment it followed one framework: a
+written spec and plan, then the build phases visible in the commit history, then CI and deployment.
+A human stayed in the loop to catch design and architecture faults; two examples:
+- replacing coarse load-band baselines with a speed-conditioned model;
+- adding the no-fault control that changed what the results claim.
+
+AI coding agents wrote much of the code. Every module ships with unit tests (pytest), and gold has
+dbt schema and reconciliation tests. Every commit in the history passes lint and its own tests, and
+every number shown is produced by the pipeline.
